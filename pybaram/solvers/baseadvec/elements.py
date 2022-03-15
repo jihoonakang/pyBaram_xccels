@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import numba as nb
 import re
 
 from pybaram.solvers.base import BaseElements
-from pybaram.utils.kernels import ArrayBank, Kernel, NullKernel
+from pybaram.backends.types import ArrayBank, Kernel, NullKernel
 from pybaram.utils.np import eps
 
 
@@ -12,11 +11,11 @@ class BaseAdvecElements(BaseElements):
     def construct_kernels(self, vertex, xw, nreg):
         self.vertex = vertex
 
-        # Upts
+        # Upts : Solution vector
         self.upts = upts = [self._ics.copy() for i in range(nreg)]
         del(self._ics)
 
-        # Upts Index
+        # Solution vector bank and assign upts index
         self.upts_in = upts_in = ArrayBank(upts, 0)
         self.upts_out = upts_out = ArrayBank(upts, 1)
 
@@ -27,12 +26,14 @@ class BaseAdvecElements(BaseElements):
 
         if self.order > 1:
             self.grad = grad = np.empty((self.ndims, self.nvars, self.neles))
-            lim = lim = np.ones((self.nvars, self.neles))
+            lim = np.ones((self.nvars, self.neles))
             limiter = self.cfg.get('solver', 'limiter', 'none')
 
             # Prepare vertex array
             vpts = vertex.make_array(limiter)
 
+        # Build kernels
+        self.compute_fpts = Kernel(self._make_compute_fpts(), upts_in, fpts)
         self.div_upts = Kernel(self._make_div_upts(), upts_out, fpts)
 
         if self.order > 1:
@@ -52,16 +53,24 @@ class BaseAdvecElements(BaseElements):
 
         self.post = Kernel(self._make_post(), upts_in)
 
-    def compute_fpts(self):
-        self.fpts[:] = self.upts_in.value
-
     def compute_resid(self):
         return np.sum(self.upts_out.value**2*self._vol, axis=1)
 
+    def _make_compute_fpts(self):
+        nvars, nface = self.nvars, self.nface
+
+        def _compute_fpts(i_begin, i_end, upts, fpts):
+            for idx in range(i_begin, i_end):
+                for j in range(nvars):
+                    tmp = upts[j, idx]
+                    for k in range(nface):
+                        fpts[k, j, idx] = tmp
+        
+        return self.be.make_loop(self.neles, _compute_fpts)
+
     def _make_div_upts(self):
         # Global variables
-        gvars = {"nb": nb, "np": np,
-                 "neles": self.neles, "rcp_vol": self.rcp_vol}
+        gvars = {"np": np, "rcp_vol": self.rcp_vol}
 
         # Parse Source term
         subs = {x: 'xc[{0}, idx]'.format(i)
@@ -78,9 +87,8 @@ class BaseAdvecElements(BaseElements):
 
         # Construct function text
         f_txt = (
-            f"@nb.jit(nopython=True, fastmath=True)\n"
-            f"def _div_upts(rhs, fpts, t=0):\n"
-            f"    for idx in range(neles): \n"
+            f"def _div_upts(i_begin, i_end, rhs, fpts, t=0):\n"
+            f"    for idx in range(i_begin, i_end): \n"
             f"        rcp_voli = rcp_vol[idx]\n"
         )
         for j, s in enumerate(src):
@@ -93,15 +101,14 @@ class BaseAdvecElements(BaseElements):
         lvars = {}
         exec(f_txt, gvars, lvars)
 
-        return lvars["_div_upts"]
+        return self.be.make_loop(self.neles, lvars["_div_upts"])
 
     def _make_grad(self):
-        nface, ndims, nvars, neles = self.nface, self.ndims, self.nvars, self.neles
+        nface, ndims, nvars = self.nface, self.ndims, self.nvars
         op = self._prelsq
 
-        @nb.jit(nopython=True, fastmath=True)
-        def _cal_grad(fpts, grad):
-            for i in range(neles):
+        def _cal_grad(i_begin, i_end, fpts, grad):
+            for i in range(i_begin, i_end):
                 for l in range(nvars):
                     for k in range(ndims):
                         tmp = 0
@@ -109,15 +116,14 @@ class BaseAdvecElements(BaseElements):
                             tmp += op[k, j, i]*fpts[j, l, i]
                         grad[k, l, i] = tmp
 
-        return _cal_grad
+        return self.be.make_loop(self.neles, _cal_grad)       
 
     def _make_recon(self):
-        nface, ndims, nvars, neles = self.nface, self.ndims, self.nvars, self.neles
+        nface, ndims, nvars = self.nface, self.ndims, self.nvars
         op = self.dxf
 
-        @nb.jit(nopython=True, fastmath=True)
-        def _cal_recon(upts, grad, lim, fpts):
-            for i in range(neles):
+        def _cal_recon(i_begin, i_end, upts, grad, lim, fpts):
+            for i in range(i_begin, i_end):
                 for l in range(nvars):
                     for k in range(nface):
                         tmp = 0
@@ -125,19 +131,17 @@ class BaseAdvecElements(BaseElements):
                             tmp += op[k, j, i]*grad[j, l, i]
                         fpts[k, l, i] = upts[l, i] + lim[l, i]*tmp
 
-        return _cal_recon
+        return self.be.make_loop(self.neles, _cal_recon)
 
     def _make_mlp_u(self, limiter):
-        nvtx, ndims, nvars, neles = self.nvtx, self.ndims, self.nvars, self.neles
+        nvtx, ndims, nvars = self.nvtx, self.ndims, self.nvars
 
         dx = self.dxv
         cons = self._vcon.T
 
-        @nb.jit(nopython=True, fastmath=True)
         def u1(dup, dum, ee2):
             return min(1.0, dup/dum)
 
-        @nb.jit(nopython=True, fastmath=True)
         def u2(dup, dum, ee2):
             dup2 = dup**2
             dum2 = dum**2
@@ -150,15 +154,14 @@ class BaseAdvecElements(BaseElements):
         if limiter == 'mlp-u2':
             is_u2 = True
             u2k = self.cfg.getfloat('solver', 'u2k', 5.0)
-            limf = u2
+            limf = self.be.compile(u2)
         else:
             is_u2 = False
             u2k = 0.0
-            limf = u1
+            limf = self.be.compile(u1)
 
-        @nb.jit(nopython=True, fastmath=True)
-        def _cal_mlp_u(upts, grad, vext, lim):
-            for i in range(neles):
+        def _cal_mlp_u(i_begin, i_end, upts, grad, vext, lim):
+            for i in range(i_begin, i_end):
                 for j in range(nvtx):
                     vi = cons[j, i]
                     for k in range(nvars):
@@ -188,17 +191,16 @@ class BaseAdvecElements(BaseElements):
                         else:
                             lim[k, i] = min(lim[k, i], limj)
 
-        return _cal_mlp_u
+        return self.be.make_loop(self.neles, _cal_mlp_u)
 
     def _make_post(self):
         neles = self.neles
 
         _fix_nonPys = self.fix_nonPys_container()
 
-        @nb.jit(nopython=True, fastmath=True)
-        def post(upts):
+        def post(i_begin, i_end, upts):
             # Update
-            for idx in range(neles):
+            for idx in range(i_begin, i_end):
                 _fix_nonPys(upts[:, idx])
 
-        return post
+        return self.be.make_loop(neles, post)

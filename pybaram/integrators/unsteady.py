@@ -1,15 +1,26 @@
+# -*- coding: utf-8 -*-
 from mpi4py import MPI
+from pybaram.backends.types import Kernel
 from pybaram.inifile import INIFile
 from pybaram.integrators.base import BaseIntegrator
+from pybaram.utils.misc import ProxyList
 
 import numpy as np
 
 
 class BaseUnsteadyIntegrator(BaseIntegrator):
+    """
+    간단한 Time-marching Integrator
+    - EulerExplicit
+    - Runge-Kutta
+    """
     mode = 'unsteady'
 
-    def __init__(self, cfg, msh, soln, comm):
+    def __init__(self, be, cfg, msh, soln, comm):
+        # MPI communicator 저장
         self._comm = comm
+
+        # 계산 시간 리스트
         self.tlist = eval(cfg.get('solver-time-integrator', 'time'))
 
         if soln:
@@ -23,8 +34,9 @@ class BaseUnsteadyIntegrator(BaseIntegrator):
             self.tcurr = self.tlist[0]
             self.iter = 0
 
-        super().__init__(cfg, msh, soln, comm)
+        super().__init__(be, cfg, msh, soln, comm)
 
+        # Runge-Kutta stage 계산 Kernel 생성
         self.construct_stages()
 
         # Configure time step method
@@ -41,21 +53,35 @@ class BaseUnsteadyIntegrator(BaseIntegrator):
         tmp = np.arange(tlist[0], tlist[-1], dt)
         self.tlist = np.sort(np.unique(np.concatenate([tlist, tmp])))
 
-    @staticmethod
-    def _make_stages(out, *args):
-        eq_str = '+'.join('{}*ele.upts[{}]'.format(a, idx)
-                          for a, idx in zip(args[::2], args[1::2]))
+    def _make_stages(self, out, *args):
+        # 계산 Kernel 함수 Python 코드 생성
+        eq_str = '+'.join('{}*upts[{}][j, idx]'.format(a, i) for a, i in zip(args[::2], args[1::2]))
+        f_txt =(
+            f"def stage(i_begin, i_end, dt, *upts):\n"
+            f"  for idx in range(i_begin, i_end):\n"
+            f"      for j in range(nvars):\n"
+        )
+        f_txt += "          upts[{}][j, idx] = {}".format(out, eq_str)
 
-        def run(ele, dt):
-            ele.upts[out] = eval(eq_str)
+        kernels = []
+        for ele in self.sys.eles:
+            # Elements 별로 Stage 컴파일
+            gvars = {'nvars' : ele.nvars}
+            lvars = {}
+            exec(f_txt, gvars, lvars)
 
-        return run
+            # Loop 구성 및 Kernel 생성
+            _stage = self.be.make_loop(ele.neles, lvars['stage'])
+            kernels.append(Kernel(_stage, *ele.upts, arg_trans_pos=True))
+        
+        return ProxyList(kernels)
 
     def run(self):
         for t in self.tlist:
             self.advance_to(t)
 
     def _dt_cfl(self, ttag):
+        # CFL 조건에 따른 timestep 계산
         self.sys.timestep(self.cfl, self._curr_idx)
         dt = min(self.sys.eles.dt.min())
 
@@ -85,7 +111,7 @@ class EulerExplicit(BaseUnsteadyIntegrator):
         stages = self._stages
 
         sys.rhside()
-        sys.eles.apply(stages[0], dt)
+        stages[0](dt)
 
         return 0
 
@@ -105,12 +131,12 @@ class TVDRK3(BaseUnsteadyIntegrator):
         stages = self._stages
 
         sys.rhside(t=t)
-        sys.eles.apply(stages[0], dt)
+        stages[0](dt)
 
         sys.rhside(2, 1, t=t)
-        sys.eles.apply(stages[1], dt)
+        stages[1](dt)
 
         sys.rhside(2, 1, t=t)
-        sys.eles.apply(stages[2], dt)
+        stages[2](dt)
 
         return 0

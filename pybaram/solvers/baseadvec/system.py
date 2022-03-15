@@ -17,6 +17,7 @@ class BaseAdvecSystem(BaseSystem):
 
         q = self._queue
 
+        # Face에서 값 계산
         self.eles.compute_fpts()
 
         if self.mpiint:
@@ -24,6 +25,7 @@ class BaseAdvecSystem(BaseSystem):
             self.mpiint.send(q)
             self.mpiint.recv(q)
 
+        # Face에서 차이
         self.iint.compute_delu()
         self.bint.compute_delu()
 
@@ -31,6 +33,7 @@ class BaseAdvecSystem(BaseSystem):
             q.sync()
             self.mpiint.compute_delu()
 
+        # 꼭지점에서 최대/최소 계산
         self.vertex.compute_extv()
 
         if self.vertex.mpi:
@@ -38,12 +41,14 @@ class BaseAdvecSystem(BaseSystem):
             self.vertex.send(q)
             self.vertex.recv(q)
 
+        # Gradient 계산
         self.eles.compute_grad()
 
         if self.vertex.mpi:
             q.sync()
             self.vertex.unpack()
 
+        # 기울기 제한자 계산 및 경계값 계산
         self.eles.compute_mlp_u()
         self.eles.compute_recon()
 
@@ -52,6 +57,7 @@ class BaseAdvecSystem(BaseSystem):
             self.mpiint.send(q)
             self.mpiint.recv(q)
 
+        # Flux 계산
         self.iint.compute_flux()
         self.bint.compute_flux()
 
@@ -59,6 +65,7 @@ class BaseAdvecSystem(BaseSystem):
             q.sync()
             self.mpiint.compute_flux()
 
+        # div(u) 계산 
         self.eles.div_upts(t)
 
         if is_norm:

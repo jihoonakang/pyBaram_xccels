@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import numba as nb
-import re
 
 
 class BaseInters:
     name = 'base'
 
-    def __init__(self, cfg, elemap, lhs):
-        # cfg 저장
+    def __init__(self, be, cfg, elemap, lhs):
+        # be and cfg 저장
+        self.be = be
         self.cfg = cfg
 
         # Dimension 저장
@@ -40,14 +39,14 @@ class BaseInters:
 
 
 class BaseIntInters(BaseInters):
-    def __init__(self, cfg, elemap, lhs, rhs):
-        super().__init__(cfg, elemap, lhs)
+    def __init__(self, be, cfg, elemap, lhs, rhs):
+        super().__init__(be, cfg, elemap, lhs)
 
         self._lidx = self._get_index(elemap, lhs)
         self._ridx = self._get_index(elemap, rhs)
 
         if self.order > 1:
-            # Delx
+            # Delx = xc2 - xc1
             dxc = [cell.dxc for cell in elemap.values()]
             self._compute_dxc(*dxc)
 
@@ -63,9 +62,8 @@ class BaseIntInters(BaseInters):
         # Connecting vector from adjacent elements
         self._dx_adj = np.empty((ndims, nface))
 
-        @nb.jit(nopython=True, fastmath=True)
-        def compute_dxc(dx_adj, *dxc):
-            for idx in range(nface):
+        def compute_dxc(i_begin, i_end, dx_adj, *dxc):
+            for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 rti, rfi, rei = rt[idx], rf[idx], re[idx]
 
@@ -79,7 +77,7 @@ class BaseIntInters(BaseInters):
                     dxc[lti][lfi, lei, jdx] = dx
                     dxc[rti][rfi, rei, jdx] = -dx
 
-        compute_dxc(self._dx_adj, *dx)
+        self.be.make_loop(nface, compute_dxc)(self._dx_adj, *dx)
 
     def _compute_nei_ele(self, elemap):
         nei_ele = [ele.nei_ele for ele in elemap.values()]
@@ -99,8 +97,8 @@ class BaseIntInters(BaseInters):
 class BaseBCInters(BaseInters):
     _reqs = None
 
-    def __init__(self, cfg, elemap, lhs, bctype):
-        super().__init__(cfg, elemap, lhs)
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs)
         self.bctype = bctype
 
         self._lidx = self._get_index(elemap, lhs)
@@ -125,9 +123,8 @@ class BaseBCInters(BaseInters):
         # Connecting vector from adjacent elements
         self._dx_adj = np.empty((ndims, nface))
 
-        @nb.jit(nopython=True, fastmath=True)
-        def compute_dxc(dx_adj, *dxc):
-            for idx in range(nface):
+        def compute_dxc(i_begin, i_end, dx_adj, *dxc):
+            for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
                 # dxn = (xf - xc)*nf
@@ -140,12 +137,12 @@ class BaseBCInters(BaseInters):
                     dxc[lti][lfi, lei, jdx] = dx
                     dx_adj[jdx, idx] = dx
 
-        compute_dxc(self._dx_adj, *dx)
+        self.be.make_loop(nface, compute_dxc)(self._dx_adj, *dx)
 
 
 class BaseMPIInters(BaseInters):
-    def __init__(self, cfg, elemap, lhs, dest):
-        super().__init__(cfg, elemap, lhs)
+    def __init__(self, be, cfg, elemap, lhs, dest):
+        super().__init__(be, cfg, elemap, lhs)
         self._dest = dest
 
         self._lidx = self._get_index(elemap, lhs)
@@ -165,17 +162,15 @@ class BaseMPIInters(BaseInters):
         # Connecting vector from adjacent elements
         self._dx_adj = np.empty((ndims, nface))
 
-        @nb.jit(nopython=True, fastmath=True)
-        def pack(buf, *dxc):
-            for idx in range(nface):
+        def pack(i_begin, i_end, buf, *dxc):
+            for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
                 for jdx in range(ndims):
                     buf[idx, jdx] = dxc[lti][lfi, lei, jdx]
 
-        @nb.jit(nopython=True, fastmath=True)
-        def compute_dxc(dx_adj, buf, *dxc):
-            for idx in range(nface):
+        def compute_dxc(i_begin, i_end, dx_adj, buf, *dxc):
+            for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
                 for jdx in range(ndims):
@@ -187,6 +182,6 @@ class BaseMPIInters(BaseInters):
                     dxc[lti][lfi, lei, jdx] = dx
                     dx_adj[jdx, idx] = dx
 
-        pack(buf, *dx)
+        self.be.make_loop(nface, pack)(buf, *dx)
         comm.Sendrecv_replace(buf, dest=self._dest, source=self._dest)
-        compute_dxc(self._dx_adj, buf, *dx)
+        self.be.make_loop(nface, compute_dxc)(self._dx_adj, buf, *dx)

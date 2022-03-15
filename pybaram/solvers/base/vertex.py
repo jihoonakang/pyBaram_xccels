@@ -3,8 +3,9 @@ import numpy as np
 
 
 class BaseVertex:
-    def __init__(self, cfg, elemap, vtx, ivtx, neivtx):
-        # cfg 저장
+    def __init__(self, be, cfg, elemap, vtx, ivtx, neivtx):
+        # be and cfg 저장
+        self.be = be
         self.cfg = cfg
 
         # Dimension 저장

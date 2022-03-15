@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 from pybaram.utils.misc import ProxyList
-from pybaram.utils.kernels import Kernel, NullKernel
+from pybaram.backends.types import Kernel, NullKernel
 from pybaram.solvers.base import BaseVertex
 
 import numpy as np
-import numba as nb
 
 
 class BaseAdvecVertex(BaseVertex):
@@ -24,10 +23,12 @@ class BaseAdvecVertex(BaseVertex):
         limiter = self.cfg.get('solver', 'limiter', 'none')
 
         if order > 1 and limiter != 'none':
+            # 꼭지점에서 최대/최소값 계산
             upts_in = [ele.upts_in for ele in elemap.values()]
             self.compute_extv = Kernel(self._make_extv(), self.vpts, *upts_in)
 
             if self._neivtx:
+                # MPI 병렬시 꼭지점 값 통신 Kernel
                 self.mpi = True
                 self._construct_neighbors(self._neivtx)
             else:
@@ -39,11 +40,10 @@ class BaseAdvecVertex(BaseVertex):
     def _make_extv(self):
         ivtx = self._ivtx
         t, e, _ = self._idx
-        nvtx, nvars = self.nvtx, self.nvars
+        nvars = self.nvars
 
-        @nb.jit(nopython=True, fastmath=True)
-        def cal_extv(vext, *upts):
-            for i in range(nvtx):
+        def cal_extv(i_begin, i_end, vext, *upts):
+            for i in range(i_begin, i_end):
                 for idx in range(ivtx[i], ivtx[i+1]):
                     ti, ei = t[idx], e[idx]
                     for jdx in range(nvars):
@@ -56,7 +56,7 @@ class BaseAdvecVertex(BaseVertex):
                             vext[1, jdx, i] = min(
                                 vext[1, jdx, i], upts[ti][jdx, ei])
 
-        return cal_extv
+        return self.be.make_loop(self.nvtx, cal_extv)
 
     def _construct_neighbors(self, neivtx):
         from mpi4py import MPI
@@ -98,32 +98,28 @@ class BaseAdvecVertex(BaseVertex):
         self.rbufs = ProxyList(rbufs)
 
     def _make_pack(self, ivtx):
-        n = len(ivtx)
         nvars = self.nvars
 
-        @nb.jit(nopython=True, fastmath=True)
-        def pack(vext, buf):
-            for idx in range(n):
+        def pack(i_begin, i_end, vext, buf):
+            for idx in range(i_begin, i_end):
                 iv = ivtx[idx]
                 for jdx in range(nvars):
                     buf[0, jdx, idx] = vext[0, jdx, iv]
                     buf[1, jdx, idx] = vext[1, jdx, iv]
 
-        return pack
+        return self.be.make_loop(len(ivtx), pack)
 
     def _make_unpack(self, ivtx):
-        n = len(ivtx)
         nvars = self.nvars
 
-        @nb.jit(nopython=True, fastmath=True)
-        def unpack(vext, buf):
-            for idx in range(n):
+        def unpack(i_begin, i_end, vext, buf):
+            for idx in range(i_begin, i_end):
                 iv = ivtx[idx]
                 for jdx in range(nvars):
                     vext[0, jdx, iv] = max(vext[0, jdx, iv], buf[0, jdx, idx])
                     vext[1, jdx, iv] = min(vext[1, jdx, iv], buf[1, jdx, idx])
 
-        return unpack
+        return self.be.make_loop(len(ivtx), unpack)
 
     def _make_send(self, buf, dest):
         from mpi4py import MPI

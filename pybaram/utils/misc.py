@@ -38,3 +38,6 @@ class ProxyList(list):
 
     def apply(self, fn, *args, **kwargs):
         return ProxyList([fn(item, *args, **kwargs) for item in self])
+
+    def apply_at(self, name, fn, *args, **kwargs):
+        return ProxyList([fn(*getattr(item, name), args, **kwargs) for item in self])

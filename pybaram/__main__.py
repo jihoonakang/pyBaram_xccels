@@ -1,8 +1,9 @@
 from argparse import ArgumentParser, FileType
+from gc import callbacks
 from mpi4py import MPI
 
 from pybaram.inifile import INIFile
-from pybaram.backend import get_backend
+from pybaram.backends import get_backend
 from pybaram.readers import get_reader
 from pybaram.partitions import get_partition
 from pybaram.integrators import get_integrator
@@ -39,8 +40,11 @@ def process_common(msh, soln, cfg):
     # MPI comm
     comm = MPI.COMM_WORLD
 
+    # Get backend
+    backend = get_backend('cpu', cfg)
+
     # Get integrator
-    integrator = get_integrator(cfg, msh, soln, comm)
+    integrator = get_integrator(backend, cfg, msh, soln, comm)
 
     # Add progress bar
     if comm.rank == 0:

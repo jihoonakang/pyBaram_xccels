@@ -1,16 +1,20 @@
+# -*- coding: utf-8 -*-
 from pybaram.plugins import get_plugin
 from pybaram.solvers import get_system
 from pybaram.utils.misc import ProxyList
 
 
 class BaseIntegrator:
-    def __init__(self, cfg, msh, soln, comm):
-        self.sys = get_system(cfg, msh, soln, comm, self.nreg)
-        self.mesh = msh
+    def __init__(self, be, cfg, msh, soln, comm):
+        self.be = be
+        
+        # Get equation system
+        self.sys = get_system(be, cfg, msh, soln, comm, self.nreg)
 
+        self.mesh = msh
         self._curr_idx = 0
 
-        # Check aux array
+        # Check aux array (turbulence variables or others for post processing)
         try:
             self.curr_aux
             self.is_aux=True

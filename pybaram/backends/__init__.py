@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from pybaram.backend.base import Backend
-from pybaram.backend.cpu.backend import CPUBackend
+from pybaram.backends.base import Backend
+from pybaram.backends.cpu.backend import CPUBackend
 from pybaram.utils.misc import subclass_by_name
 
 

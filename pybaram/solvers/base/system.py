@@ -5,7 +5,7 @@ import re
 from collections import OrderedDict
 from pybaram.solvers.base import BaseElements, BaseIntInters, BaseBCInters, BaseMPIInters, BaseVertex
 from pybaram.utils.misc import ProxyList, subclass_by_name
-from pybaram.utils.kernels import Queue
+from pybaram.backends.types import Queue
 
 
 def get_spts(nodepts, etype, cell):
@@ -27,25 +27,26 @@ class BaseSystem:
     _bcinters_cls = BaseBCInters
     _vertex_cls = BaseVertex
 
-    def __init__(self, cfg, msh, soln, comm, nreg):
+    def __init__(self, be, cfg, msh, soln, comm, nreg):
+        # Save parallel infos
         self._comm = comm
         self.rank = rank = comm.rank
 
         # Load elements
-        self.eles, elemap = self.load_elements(msh, soln, cfg, rank)
+        self.eles, elemap = self.load_elements(msh, soln, be, cfg, rank)
         self.ndims = next(iter(self.eles)).ndims
 
         # load interfaces
-        self.iint = self.load_int_inters(msh, cfg, rank, elemap)
+        self.iint = self.load_int_inters(msh, be, cfg, rank, elemap)
 
         # load bc
-        self.bint = bint = self.load_bc_inters(msh, cfg, rank, elemap)
+        self.bint = bint = self.load_bc_inters(msh, be, cfg, rank, elemap)
 
         # load mpiint
-        self.mpiint = self.load_mpi_inters(msh, cfg, rank, elemap)
+        self.mpiint = self.load_mpi_inters(msh, be, cfg, rank, elemap)
 
         # Load vertex
-        self.vertex = vertex = self.load_vertex(msh, cfg, rank, elemap)
+        self.vertex = vertex = self.load_vertex(msh, be, cfg, rank, elemap)
 
         # Compute wall boundary
         if hasattr(self, 'compute_bc_wall'):
@@ -59,11 +60,7 @@ class BaseSystem:
         self.bint.construct_kernels(elemap)
 
         # Check reconstructed or not
-        order = cfg.getint('solver', 'order', 1)
-        if order > 1:
-            self._is_recon = True
-        else:
-            self._is_recon = False
+        self._is_recon = (cfg.getint('solver', 'order', 1) > 1)
 
         if self.mpiint:
             from mpi4py import MPI
@@ -71,12 +68,13 @@ class BaseSystem:
             # Construct MPI kernels
             self.mpiint.construct_kernels(elemap)
 
+        # Construct Vertex kernels
         self.vertex.construct_kernels(elemap)
 
         # Construct queue
         self._queue = Queue()
 
-    def load_elements(self, msh, soln, cfg, rank):
+    def load_elements(self, msh, soln, be, cfg, rank):
         elemap = OrderedDict()
         eles = ProxyList()
 
@@ -91,11 +89,11 @@ class BaseSystem:
                 cons = msh[m.group(0)]
                 spts = get_spts(nodepts, etype, cons)
 
-                # Local vertex connecivity
+                # Local vertex connectivity
                 vmap = dict(zip(nmap, np.arange(len(nmap))))
                 vcon = np.array([[vmap[i] for i in e] for e in cons])
 
-                ele = self._elements_cls(cfg, etype, spts, vcon)
+                ele = self._elements_cls(be, cfg, etype, spts, vcon)
                 elemap[etype] = ele
                 eles.append(ele)
 
@@ -109,14 +107,14 @@ class BaseSystem:
 
         return eles, elemap
 
-    def load_int_inters(self, msh, cfg, rank, elemap):
+    def load_int_inters(self, msh, be, cfg, rank, elemap):
         key = 'con_p{0}'.format(rank)
         lhs, rhs = msh[key].astype('U4,i4,i1,i1').tolist()
-        iint = self._intinters_cls(cfg, elemap, lhs, rhs)
+        iint = self._intinters_cls(be, cfg, elemap, lhs, rhs)
 
         return iint
 
-    def load_mpi_inters(self, msh, cfg, rank, elemap):
+    def load_mpi_inters(self, msh, be, cfg, rank, elemap):
         mpiint = ProxyList()
 
         for key in msh:
@@ -125,10 +123,10 @@ class BaseSystem:
             if m:
                 lhs = msh[m.group(0)].astype('U4,i4,i1,i1').tolist()
                 mpiint.append(self._mpiinters_cls(
-                    cfg, elemap, lhs, int(m.group(1))))
+                    be, cfg, elemap, lhs, int(m.group(1))))
         return mpiint
 
-    def load_bc_inters(self, msh, cfg, rank, elemap):
+    def load_bc_inters(self, msh, be, cfg, rank, elemap):
         bint = ProxyList()
         for key in msh:
             m = re.match(r'bcon_([a-z_\d]+)_p{}$'.format(rank), key)
@@ -141,12 +139,12 @@ class BaseSystem:
 
                 bint.append(
                     subclass_by_name(self._bcinters_cls, bctype)
-                    (cfg, elemap, lhs, m.group(1))
+                    (be, cfg, elemap, lhs, m.group(1))
                 )
 
         return bint
 
-    def load_vertex(self, msh, cfg, rank, elemap):
+    def load_vertex(self, msh, be, cfg, rank, elemap):
         nei_vtx = {}
 
         for key in msh:
@@ -158,6 +156,6 @@ class BaseSystem:
 
         vtx = msh['vtx_p{}'.format(rank)].astype('U4,i4,i1,i1').tolist()
         ivtx = msh['ivtx_p{}'.format(rank)]
-        vertex = self._vertex_cls(cfg, elemap, vtx, ivtx, nei_vtx)
+        vertex = self._vertex_cls(be, cfg, elemap, vtx, ivtx, nei_vtx)
 
         return vertex

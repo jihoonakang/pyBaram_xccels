@@ -4,12 +4,11 @@ from pybaram.solvers.euler.rsolvers import get_rsolver
 from pybaram.solvers.euler.bcs import get_bc
 
 import numpy as np
-import numba as nb
 
 
 class EulerIntInters(BaseAdvecIntInters):
     def _make_flux(self):
-        nface, ndims, nvars = self.nfpts, self.ndims, self.nvars
+        ndims, nvars = self.ndims, self.nvars
         lt, le, lf = self._lidx
         rt, re, rf = self._ridx
         nf, sf = self._vec_snorm, self._mag_snorm
@@ -17,14 +16,13 @@ class EulerIntInters(BaseAdvecIntInters):
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
         pre, flux = get_rsolver(scheme, ndims, nvars, **self._const)
 
-        @nb.jit(nopython=True, fastmath=True)
-        def comm_flux(*uf):
+        def comm_flux(i_begin, i_end, *uf):
             ul, ur = np.empty(nvars), np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
             nfi = np.empty(ndims)
 
-            for idx in range(nface):
+            for idx in range(i_begin, i_end):
                 for jdx in range(ndims):
                     nfi[jdx] = nf[jdx, idx]
 
@@ -40,26 +38,25 @@ class EulerIntInters(BaseAdvecIntInters):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
                     uf[rti][rfi, jdx, rei] = -fn[jdx]*sf[idx]
 
-        return comm_flux
+        return self.be.make_loop(self.nfpts, comm_flux)
 
 
 class EulerMPIInters(BaseAdvecMPIInters):
     def _make_flux(self):
-        nface, ndims, nvars = self.nfpts, self.ndims, self.nvars
+        ndims, nvars = self.ndims, self.nvars
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm
 
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
         pre, flux = get_rsolver(scheme, ndims, nvars, **self._const)
 
-        @nb.jit(nopython=True, fastmath=True)
-        def comm_flux(rhs, *uf):
+        def comm_flux(i_begin, i_end, rhs, *uf):
             ul, ur = np.empty(nvars), np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
             nfi = np.empty(ndims)
 
-            for idx in range(nface):
+            for idx in range(i_begin, i_end):
                 for jdx in range(ndims):
                     nfi[jdx] = nf[jdx, idx]
 
@@ -73,14 +70,14 @@ class EulerMPIInters(BaseAdvecMPIInters):
                 for jdx in range(nvars):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
-        return comm_flux
+        return self.be.make_loop(self.nfpts, comm_flux)
 
 
 class EulerBCInters(BaseAdvecBCInters):
     _get_bc = get_bc
 
     def _make_flux(self):
-        nface, ndims, nvars = self.nfpts, self.ndims, self.nvars
+        ndims, nvars = self.ndims, self.nvars
 
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
         pre, flux = get_rsolver(scheme, ndims, nvars, **self._const)
@@ -90,14 +87,13 @@ class EulerBCInters(BaseAdvecBCInters):
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm,
 
-        @nb.jit(nopython=True, fastmath=True)
-        def bc_flux(*uf):
+        def bc_flux(i_begin, i_end, *uf):
             ul, ur = np.empty(nvars), np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
             nfi = np.empty(ndims)
 
-            for idx in range(nface):
+            for idx in range(i_begin, i_end):
                 for jdx in range(ndims):
                     nfi[jdx] = nf[jdx, idx]
 
@@ -112,7 +108,7 @@ class EulerBCInters(BaseAdvecBCInters):
                 for jdx in range(nvars):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
-        return bc_flux
+        return self.be.make_loop(self.nfpts, bc_flux)
 
 
 class EulerSupOutBCInters(EulerBCInters):

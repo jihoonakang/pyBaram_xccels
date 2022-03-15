@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 from pybaram.solvers.base import BaseIntInters, BaseBCInters, BaseMPIInters
-from pybaram.utils.kernels import Kernel, NullKernel
+from pybaram.backends.types import Kernel, NullKernel
 from pybaram.utils.np import npeval
 
 import numpy as np
-import numba as nb
 import re
 
 
@@ -21,13 +20,12 @@ class BaseAdvecIntInters(BaseIntInters):
             self.compute_delu = NullKernel
 
     def _make_delu(self):
-        nface, nvars = self.nfpts, self.nvars
+        nvars = self.nvars
         lt, le, lf = self._lidx
         rt, re, rf = self._ridx
 
-        @nb.jit(nopython=True, fastmath=True)
-        def compute_delu(*uf):
-            for idx in range(nface):
+        def compute_delu(i_begin, i_end, *uf):
+            for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 rti, rfi, rei = rt[idx], rf[idx], re[idx]
 
@@ -38,7 +36,7 @@ class BaseAdvecIntInters(BaseIntInters):
                     uf[lti][lfi, jdx, lei] = du
                     uf[rti][rfi, jdx, rei] = -du
 
-        return compute_delu
+        return self.be.make_loop(self.nfpts, compute_delu)
 
 
 class BaseAdvecMPIInters(BaseMPIInters):
@@ -63,12 +61,11 @@ class BaseAdvecMPIInters(BaseMPIInters):
         self.recv, self.rreq = self._make_recv(rhs)
 
     def _make_delu(self):
-        nface, nvars = self.nfpts, self.nvars
+        nvars = self.nvars
         lt, le, lf = self._lidx
 
-        @nb.jit(nopython=True, fastmath=True)
-        def compute_delu(rhs, *uf):
-            for idx in range(nface):
+        def compute_delu(i_begin, i_end, rhs, *uf):
+            for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
                 for jdx in range(nvars):
@@ -77,21 +74,20 @@ class BaseAdvecMPIInters(BaseMPIInters):
                     du = ur - ul
                     uf[lti][lfi, jdx, lei] = du
 
-        return compute_delu
+        return self.be.make_loop(self.nfpts, compute_delu)
 
     def _make_pack(self):
-        nvars, nface = self.nvars, self.nfpts
+        nvars = self.nvars
         lt, le, lf = self._lidx
 
-        @nb.jit(nopython=True, fastmath=True)
-        def pack(lhs, *uf):
-            for idx in range(nface):
+        def pack(i_begin, i_end, lhs, *uf):
+            for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
                 for jdx in range(nvars):
                     lhs[jdx, idx] = uf[lti][lfi, jdx, lei]
 
-        return pack
+        return self.be.make_loop(self.nfpts, pack)
 
     def _sendrecv(self, mpifn, arr):
         req = mpifn(arr, self._dest, self._tag)
@@ -151,18 +147,17 @@ class BaseAdvecBCInters(BaseBCInters):
             self.compute_delu = NullKernel
 
     def _make_delu(self):
-        nface, nvars, ndims = self.nfpts, self.nvars, self.ndims
+        nvars, ndims = self.nvars, self.ndims
         lt, le, lf = self._lidx
         nf = self._vec_snorm
 
         bc = self.bc
 
-        @nb.jit(nopython=True, fastmath=True)
-        def compute_delu(*uf):
+        def compute_delu(i_begin, i_end, *uf):
             ul, ur = np.empty(nvars), np.empty(nvars)
             nfi = np.empty(ndims)
 
-            for idx in range(nface):
+            for idx in range(i_begin, i_end):
                 for jdx in range(ndims):
                     nfi[jdx] = nf[jdx, idx]
 
@@ -177,4 +172,4 @@ class BaseAdvecBCInters(BaseBCInters):
                     du = ur[jdx] - ul[jdx]
                     uf[lti][lfi, jdx, lei] = du
 
-        return compute_delu
+        return self.be.make_loop(self.nfpts, compute_delu)

@@ -9,8 +9,9 @@ from pybaram.utils.np import chop, npeval
 class BaseElements:
     name = 'base'
 
-    def __init__(self, cfg, name, eles, vcon):
+    def __init__(self, be, cfg, name, eles, vcon):
         # Argument save
+        self.be = be
         self.cfg = cfg
         self.name = name
         self.eles = eles
