@@ -41,6 +41,9 @@ class Kernel:
     def update_args(self, *args):
         self._args = args
 
+    @property
+    def is_compiled(self):
+        return self._fun.signatures != []
 
 class Queue:
     """

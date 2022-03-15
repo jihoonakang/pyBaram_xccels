@@ -18,6 +18,9 @@ class Progressbar:
         # Mark initial time
         self._tinit = time.time()
 
+        # is_first
+        self._is_first = True
+
     def __call__(self, t):
         # progress
         prog = t*self._rintv
@@ -41,4 +44,9 @@ class Progressbar:
         # Text
         text = ' '.join([bar, status_txt, eta_txt])
         sys.stdout.write(text)
+
+        if self._is_first:
+            self._is_first = False
+            sys.stdout.write('\n')
+
         sys.stdout.flush()
