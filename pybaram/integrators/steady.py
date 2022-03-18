@@ -88,7 +88,7 @@ class BaseSteadyIntegrator(BaseIntegrator):
             _stage = self.be.make_loop(ele.neles, lvars['stage'])
             kernels.append(Kernel(_stage, ele.dt, *ele.upts))
         
-        return ProxyList(kernels)
+        return MetaKernel(kernels)
 
     def run(self):
         while self.iter < self.itermax:
@@ -152,10 +152,11 @@ class TVDRK3(BaseSteadyIntegrator):
     nreg = 3
 
     def construct_stages(self):
-        self._stages = stages = []
-        stages.append(self._make_stages(2, 1, 0, 'dt', 1))
-        stages.append(self._make_stages(2, 3/4, 0, 1/4, 2, 'dt/4', 1))
-        stages.append(self._make_stages(0, 1/3, 0, 2/3, 2, '2*dt/3', 1))
+        self._stages = [
+            self._make_stages(2, 1, 0, 'dt', 1),
+            self._make_stages(2, 3/4, 0, 1/4, 2, 'dt/4', 1),
+            self._make_stages(0, 1/3, 0, 2/3, 2, '2*dt/3', 1),
+        ]
 
     def step(self):
         stages = self._stages
@@ -228,8 +229,8 @@ class LUSGS(BaseSteadyIntegrator):
             diag = np.empty(ele.neles)
             lambdaf = np.empty((ele.nface, ele.neles))
 
-            # Sweep Marker (lowered : 1, Uppered : 0)
-            sweep_marked = np.zeros(ele.neles, dtype=int)
+            # Sweep Marker (lowered : 1, Uppered : -1)
+            sweep_marked = np.zeros(ele.neles, dtype=np.int)
 
             _flux = ele.flux_container()
             _lambdaf = ele.make_wave_speed()
@@ -244,32 +245,28 @@ class LUSGS(BaseSteadyIntegrator):
                 ele.upts[0], ele.dt, diag, lambdaf
             )
             
-            lsweeps = MetaKernel([
+            lsweeps = [
                 Kernel(be.make_loop(n0=n0, ne=ne, func=_lsweep),
                 sweep_marked, ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf
                 ) 
                 for n0, ne in zip(ncolor[:-1], ncolor[1:])
-            ])
+            ]
 
-            usweeps = MetaKernel([
+            usweeps = [
                 Kernel(be.make_loop(n0=n0, ne=ne, func=_usweep),
                 sweep_marked, ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf
                 ) 
                 for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
-            ])
+            ]
 
-            #ele.lusgs = MetaKernel([pre_lusgs, lsweeps, usweeps])
-            ele.pre_lusgs = pre_lusgs
-            ele.lsweeps, ele.usweeps = lsweeps, usweeps
+            ele.lusgs = MetaKernel((pre_lusgs, *lsweeps, *usweeps))
             ele.update = Kernel(be.make_loop(ele.neles, _update),
                 ele.upts[0], ele.upts[1]
             )
     
     def step(self):
         resid = self.rhs(0, 1, is_norm=True)
-        self.sys.eles.pre_lusgs()
-        self.sys.eles.lsweeps()
-        self.sys.eles.usweeps()
+        self.sys.eles.lusgs()
         self.sys.eles.update()
 
         return 0, resid

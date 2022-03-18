@@ -31,7 +31,7 @@ class BaseElements:
 
         # ifpts
         #if cfg.get('solver-time-integrator', 'stepper') == 'simple-point-implicit':
-        self.nei_ele = -np.ones((nface, self.neles), dtype=np.int)
+        self.nei_ele = np.ones((nface, self.neles), dtype=np.int)*-1
 
     def coloring(self):
         # Multi-Coloring
@@ -73,7 +73,7 @@ class BaseElements:
                 max_color += 1
                 color[idx] = max_color
 
-        ele_idx = np.arange(self.neles, dtype=int)
+        ele_idx = np.arange(self.neles, dtype=np.int)
 
         # Linked List 형식 저장
         ncolor = np.cumsum([sum(color==i) for i in range(max_color+1)])

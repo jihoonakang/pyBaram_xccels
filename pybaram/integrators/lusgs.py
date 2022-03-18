@@ -113,7 +113,7 @@ def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
         # Upper sweep (backward)
         for _idx in range(i_end-1, i_begin-1, -1):
             idx = icolor[_idx]
-            marked[idx] = 0
+            marked[idx] = -1
 
             for kdx in range(nvars):
                 df[kdx] = 0.0
@@ -124,7 +124,7 @@ def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
 
                 neib = nei_ele[jdx, idx]
                 if neib > -1:
-                    if marked[neib] == 0:
+                    if marked[neib] == -1:
                         for kdx in range(nvars):
                             u[kdx] = uptsb[kdx, neib]
                             du[kdx] = 0
