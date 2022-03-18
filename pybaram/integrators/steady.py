@@ -223,21 +223,18 @@ class LUSGS(BaseSteadyIntegrator):
         # Assign LU-SGS
         for ele in self.sys.eles:
             # Get Coloring result
-            ncolor, icolor = ele.coloring()
+            ncolor, icolor, lev_color = ele.coloring()
              
             # diagonal and lambda array
             diag = np.empty(ele.neles)
             lambdaf = np.empty((ele.nface, ele.neles))
-
-            # Sweep Marker (lowered : 1, Uppered : -1)
-            sweep_marked = np.zeros(ele.neles, dtype=np.int)
 
             _flux = ele.flux_container()
             _lambdaf = ele.make_wave_speed()
 
             # Make LU-SGS
             _pre_lusgs, _lsweep, _usweep, _update = make_lusgs(
-                be, ele, icolor, _flux, _lambdaf, factor=1.0
+                be, ele, icolor, lev_color, _flux, _lambdaf, factor=1.0
             )
 
             pre_lusgs = Kernel(
@@ -247,14 +244,14 @@ class LUSGS(BaseSteadyIntegrator):
             
             lsweeps = [
                 Kernel(be.make_loop(n0=n0, ne=ne, func=_lsweep),
-                sweep_marked, ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf
                 ) 
                 for n0, ne in zip(ncolor[:-1], ncolor[1:])
             ]
 
             usweeps = [
                 Kernel(be.make_loop(n0=n0, ne=ne, func=_usweep),
-                sweep_marked, ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf
                 ) 
                 for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
             ]

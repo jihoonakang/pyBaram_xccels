@@ -15,7 +15,7 @@ def make_diff_flux(nvars, fluxf):
     return _diff_flux
 
 
-def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
+def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
     # dimensions
     nvars, ndims, nface, neles = ele.nvars, ele.ndims, ele.nface, ele.neles
     
@@ -62,7 +62,7 @@ def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
                 lambdaf[jdx, idx] = lamf
                 diag[idx] += 0.5*lamf*fnorm_vol[jdx, idx]
 
-    def _lower_sweep(i_begin, i_end, marked, uptsb, rhsb, dub, diag, lambdaf):
+    def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
         u = np.zeros(nvars)
         du = np.zeros(nvars)
         f = np.zeros(nvars)
@@ -73,7 +73,7 @@ def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
         for _idx in range(i_begin, i_end):
             # Coloring 순서
             idx = icolor[_idx]
-            marked[idx] = 1
+            curr_level = lcolor[idx]
 
             for kdx in range(nvars):
                 df[kdx] = 0.0
@@ -84,7 +84,7 @@ def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
 
                 neib = nei_ele[jdx, idx]
                 if neib > -1:
-                    if marked[neib] == 1:
+                    if lcolor[neib] < curr_level:
                         for kdx in range(nvars):
                             u[kdx] = uptsb[kdx, neib]
                             du[kdx] = 0
@@ -102,7 +102,7 @@ def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
                 dub[kdx, idx] = (rhsb[kdx, idx] -
                                        0.5*df[kdx])/diag[idx]
 
-    def _upper_sweep(i_begin, i_end, marked, uptsb, rhsb, dub, diag, lambdaf):
+    def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
         u = np.zeros(nvars)
         du = np.zeros(nvars)
         f = np.zeros(nvars)
@@ -113,7 +113,7 @@ def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
         # Upper sweep (backward)
         for _idx in range(i_end-1, i_begin-1, -1):
             idx = icolor[_idx]
-            marked[idx] = -1
+            curr_level = lcolor[idx]
 
             for kdx in range(nvars):
                 df[kdx] = 0.0
@@ -124,7 +124,7 @@ def make_lusgs(be, ele, icolor, _flux, _lambdaf, factor=1.0):
 
                 neib = nei_ele[jdx, idx]
                 if neib > -1:
-                    if marked[neib] == -1:
+                    if lcolor[neib] > curr_level:
                         for kdx in range(nvars):
                             u[kdx] = uptsb[kdx, neib]
                             du[kdx] = 0

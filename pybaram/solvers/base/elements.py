@@ -36,9 +36,9 @@ class BaseElements:
     def coloring(self):
         # Multi-Coloring
         #TODO: 계산 시간 확인 필요
-        color = np.zeros(self.neles, dtype=int)
+        color = np.zeros(self.neles, dtype=np.int)
         max_color = 1
-        is_colored = np.empty(32, dtype=int)
+        is_colored = np.empty(32, dtype=np.int)
 
         # Assign initial color
         color[0] = 1
@@ -78,7 +78,7 @@ class BaseElements:
         # Linked List 형식 저장
         ncolor = np.cumsum([sum(color==i) for i in range(max_color+1)])
         icolor = np.concatenate([ele_idx[color==i] for i in range(max_color+1)])
-        return ncolor, icolor
+        return ncolor, icolor, color
 
     def set_ics_from_cfg(self):
         xc = self.geom.xc(self.eles).T
