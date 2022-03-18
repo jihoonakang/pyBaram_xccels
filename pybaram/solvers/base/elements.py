@@ -30,8 +30,55 @@ class BaseElements:
             self.dxc = self.xc - self.xf
 
         # ifpts
-        if cfg.get('solver-time-integrator', 'stepper') == 'lu-sgs':
-            self.nei_ele = -np.ones((nface, self.neles), dtype=np.int)
+        #if cfg.get('solver-time-integrator', 'stepper') == 'simple-point-implicit':
+        self.nei_ele = -np.ones((nface, self.neles), dtype=np.int)
+
+    def coloring(self):
+        # Multi-Coloring
+        #TODO: 계산 시간 확인 필요
+        color = np.zeros(self.neles, dtype=int)
+        max_color = 1
+        is_colored = np.empty(32, dtype=int)
+
+        # Assign initial color
+        color[0] = 1
+
+        # Search Coloring
+        for idx in range(1, self.neles):
+            # 이 컬러 번호가 주변에 있는지 확인용 자료
+            is_colored[:max_color+1] = 0
+
+            for jdx in range(self.nface):
+                # 인접 셀 탐색 후 컬러 번호가 있는지 저장
+                nei = self.nei_ele[jdx, idx]
+                if nei > 0:
+                    nei_color = color[nei]
+                    is_colored[nei_color] = 1
+            
+            # 주변에 없는 가장 작은 컬러 번호 찾기
+            is_found = False
+            for k in range(1, max_color+1):
+                if is_colored[k] == 0:
+                    if not is_found:
+                        c = k
+                        is_found = True
+                    else:
+                        c = min(c, k)
+
+            if is_found:
+                # 주변에 없으면서 가장 작은 컬러 번호 부여
+                color[idx] = c
+            else:
+                # Color level 증가 후 컬러 번호 기록
+                max_color += 1
+                color[idx] = max_color
+
+        ele_idx = np.arange(self.neles, dtype=int)
+
+        # Linked List 형식 저장
+        ncolor = np.cumsum([sum(color==i) for i in range(max_color+1)])
+        icolor = np.concatenate([ele_idx[color==i] for i in range(max_color+1)])
+        return ncolor, icolor
 
     def set_ics_from_cfg(self):
         xc = self.geom.xc(self.eles).T

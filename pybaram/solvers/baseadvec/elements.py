@@ -11,6 +11,8 @@ class BaseAdvecElements(BaseElements):
     def construct_kernels(self, vertex, xw, nreg):
         self.vertex = vertex
 
+        self.coloring()    
+
         # Upts : Solution vector
         self.upts = upts = [self._ics.copy() for i in range(nreg)]
         del(self._ics)
@@ -35,6 +37,7 @@ class BaseAdvecElements(BaseElements):
         # Build kernels
         self.compute_fpts = Kernel(self._make_compute_fpts(), upts_in, fpts)
         self.div_upts = Kernel(self._make_div_upts(), upts_out, fpts)
+        self.compute_resid = Kernel(self._make_compute_resid(), self.upts_out)
 
         if self.order > 1:
             self.compute_grad = Kernel(self._make_grad(), fpts, grad)
@@ -53,8 +56,23 @@ class BaseAdvecElements(BaseElements):
 
         self.post = Kernel(self._make_post(), upts_in)
 
-    def compute_resid(self):
-        return np.sum(self.upts_out.value**2*self._vol, axis=1)
+    def _make_compute_resid(self):
+        import numba as nb
+
+        vol = self._vol
+        neles, nvars = self.neles, self.nvars
+
+        def run(upts):
+            resid = np.empty(nvars)
+            for j in range(nvars):
+                s = 0
+                for i in nb.prange(neles):
+                    s += upts[j,i]**2*vol[i]
+                resid[j] = s
+
+            return resid
+
+        return self.be.compile(run, outer=True)
 
     def _make_compute_fpts(self):
         nvars, nface = self.nvars, self.nface

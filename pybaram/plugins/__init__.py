@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from pybaram.plugins.base import BasePlugin
+from pybaram.plugins.force import ForcePlugin
 from pybaram.plugins.stats import StatsPlugin
 from pybaram.plugins.writer import WriterPlugin
 from pybaram.utils.misc import subclass_by_name

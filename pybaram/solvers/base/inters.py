@@ -51,8 +51,8 @@ class BaseIntInters(BaseInters):
             self._compute_dxc(*dxc)
 
         # ifpts
-        if cfg.get('solver-time-integrator', 'stepper') == 'lu-sgs':
-            self._compute_nei_ele(elemap)
+        #if cfg.get('solver-time-integrator', 'stepper') == 'simple-point-implicit':
+        self._compute_nei_ele(elemap)
 
     def _compute_dxc(self, *dx):
         nface, ndims = self.nfpts, self.ndims

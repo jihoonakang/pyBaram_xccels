@@ -122,8 +122,8 @@ class EulerSlipWallBCInters(EulerBCInters):
 class EulerSupInBCInters(EulerBCInters):
     name = 'sup-in'
 
-    def __init__(self, cfg, elemap, lhs, bctype):
-        super().__init__(cfg, elemap, lhs, bctype)
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs, bctype)
 
         self._reqs = self.primevars
 
@@ -131,8 +131,8 @@ class EulerSupInBCInters(EulerBCInters):
 class EulerFarInBCInters(EulerBCInters):
     name = 'far'
 
-    def __init__(self, cfg, elemap, lhs, bctype):
-        super().__init__(cfg, elemap, lhs, bctype)
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs, bctype)
 
         self._reqs = self.primevars
 
@@ -141,5 +141,5 @@ class EulerSubOutPBCInters(EulerBCInters):
     name = 'sub-outp'
     _reqs = ['p']
 
-    def __init__(self, cfg, elemap, lhs, bctype):
-        super().__init__(cfg, elemap, lhs, bctype)
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs, bctype)

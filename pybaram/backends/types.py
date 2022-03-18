@@ -36,7 +36,7 @@ class Kernel:
         args = [arg.value if hasattr(arg, 'value') else arg for arg in args]
 
         # Run Kernel
-        self._fun(*args)
+        return self._fun(*args)
 
     def update_args(self, *args):
         self._args = args
@@ -44,6 +44,16 @@ class Kernel:
     @property
     def is_compiled(self):
         return self._fun.signatures != []
+
+
+class MetaKernel:
+    def __init__(self, kerns):
+        self._kerns = kerns
+    
+    def __call__(self, *args):
+        for kern in self._kerns:
+            kern.__call__(*args)
+
 
 class Queue:
     """

@@ -3,6 +3,7 @@ from pybaram.backends import Backend
 from pybaram.backends.cpu.loop import make_serial_loop1d, make_parallel_loop1d
 
 import numba as nb
+import os
 
 
 class CPUBackend(Backend):
@@ -15,11 +16,12 @@ class CPUBackend(Backend):
 
     def __init__(self, cfg):
         # Mutli-thread type
-        multithread = cfg.get('backend-cpu', 'multithread', default='single')
+        self.multithread = multithread = cfg.get('backend-cpu', 'multi-thread', default='single')
 
         # Loop 함수 설정
         if multithread == 'single':
             self.make_loop = make_serial_loop1d
+            os.environ['OMP_NUM_THREADS'] = '1'
         else:
             self.make_loop = make_parallel_loop1d
 
@@ -27,6 +29,8 @@ class CPUBackend(Backend):
             if multithread in ['default', 'forksafe', 'threadsafe', 'safe', 'omp', 'tbb']:
                 nb.config.THREADING_LAYER = multithread
     
-    def compile(self, func):
-        return nb.jit(nopython=True, fastmath=True)(func)
-
+    def compile(self, func, outer=False):
+        if self.multithread == 'single' or not outer:
+            return nb.jit(nopython=True, fastmath=True)(func)
+        else:
+            return nb.jit(nopython=True, fastmath=True, parallel=True)(func)
