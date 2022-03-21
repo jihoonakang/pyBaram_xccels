@@ -2,7 +2,6 @@
 import numpy as np
 
 from pybaram.solvers.baseadvec import BaseAdvecElements
-from pybaram.solvers.euler.rsolvers import flux
 from pybaram.backends.types import Kernel
 from pybaram.utils.nb import dot
 from pybaram.utils.np import eps
@@ -55,7 +54,31 @@ class FluidElements:
                 f[i + 1] = u[i + 1]*contrav + nf[i]*p
             f[nvars-1] = ht*contrav
 
+            return p, contrav
+
         return self.be.compile(flux)
+
+    def inviscid_flux_container(self):
+        return self.flux_container()
+
+    def to_flow_primevars(self):
+        gamma, pmin = self._const['gamma'], self._const['pmin']
+        ndims, nvars = self.ndims, self.nvars
+
+        def to_primevars(u, v):
+            rho, et = u[0], u[nvars-1]
+
+            for i in range(ndims):
+                v[i] = u[i + 1] / rho
+
+            p = (gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho)
+            if p < pmin:
+                p = pmin
+                u[nvars - 1] = p/(gamma-1) + 0.5*dot(u, u, ndims, 1, 1)/rho
+
+            return p
+
+        return self.be.compile(to_primevars)
 
     def fix_nonPys_container(self):
         gamma, pmin = self._const['gamma'], self._const['pmin']

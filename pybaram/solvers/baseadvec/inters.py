@@ -154,18 +154,14 @@ class BaseAdvecBCInters(BaseBCInters):
         bc = self.bc
 
         def compute_delu(i_begin, i_end, *uf):
-            ul, ur = np.empty(nvars), np.empty(nvars)
-            nfi = np.empty(ndims)
+            ur = np.empty(nvars)
 
             for idx in range(i_begin, i_end):
-                for jdx in range(ndims):
-                    nfi[jdx] = nf[jdx, idx]
+                nfi = nf[:, idx]
 
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
-                for jdx in range(nvars):
-                    ul[jdx] = uf[lti][lfi, jdx, lei]
-
+                ul = uf[lti][lfi, :, lei]
                 bc(ul, ur, nfi)
 
                 for jdx in range(nvars):

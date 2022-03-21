@@ -30,28 +30,22 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
     _diff_flux = be.compile(make_diff_flux(nvars, _flux))
 
     def _pre_lusgs(i_begin, i_end, uptsb, dt, diag, lambdaf):
-        u = np.zeros(nvars)
-        nf = np.empty(ndims)
-
         # Construct Matrix
         for idx in range(i_begin, i_end):
             diag[idx] = 1 / (dt[idx]*factor)
 
             for jdx in range(nface):
                 dx = dxc[jdx, idx]
-                for kdx in range(ndims):
-                    nf[kdx] = vec_fnorm[jdx, kdx, idx]
+                nf = vec_fnorm[jdx, :, idx]
 
                 # Wave speed at face
-                for kdx in range(nvars):
-                    u[kdx] = uptsb[kdx, idx]
+                u = uptsb[:, idx]
 
                 lamf = _lambdaf(u, nf, dx)
 
                 neib = nei_ele[jdx, idx]
                 if neib > 0:
-                    for kdx in range(nvars):
-                        u[kdx] = uptsb[kdx, neib]
+                    u = uptsb[:, neib]
 
                     # Find maximum wave speed at face
                     lamf = max(_lambdaf(u, nf, dx), lamf)
@@ -63,11 +57,9 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
                 diag[idx] += 0.5*lamf*fnorm_vol[jdx, idx]
 
     def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
-        u = np.zeros(nvars)
         du = np.zeros(nvars)
         f = np.zeros(nvars)
         dfj = np.zeros(nvars)
-        nf = np.empty(ndims)
         df = np.zeros(nvars)
 
         for _idx in range(i_begin, i_end):
@@ -79,17 +71,13 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
                 df[kdx] = 0.0
 
             for jdx in range(nface):
-                for kdx in range(ndims):
-                    nf[kdx] = vec_fnorm[jdx, kdx, idx]
+                nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
                 if neib > -1:
                     if lcolor[neib] < curr_level:
+                        u = uptsb[:, neib]
                         for kdx in range(nvars):
-                            u[kdx] = uptsb[kdx, neib]
-                            du[kdx] = 0
-
-                        for kdx in range(0, nvars):
                             du[kdx] = dub[kdx, neib]
 
                         _diff_flux(u, du, f, dfj, nf)
@@ -103,11 +91,9 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
                                        0.5*df[kdx])/diag[idx]
 
     def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
-        u = np.zeros(nvars)
         du = np.zeros(nvars)
         f = np.zeros(nvars)
         dfj = np.zeros(nvars)
-        nf = np.empty(ndims)
         df = np.zeros(nvars)
 
         # Upper sweep (backward)
@@ -119,17 +105,13 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
                 df[kdx] = 0.0
 
             for jdx in range(nface):
-                for kdx in range(ndims):
-                    nf[kdx] = vec_fnorm[jdx, kdx, idx]
+                nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
                 if neib > -1:
                     if lcolor[neib] > curr_level:
+                        u = uptsb[:, neib]
                         for kdx in range(nvars):
-                            u[kdx] = uptsb[kdx, neib]
-                            du[kdx] = 0
-
-                        for kdx in range(0, nvars):
                             du[kdx] = rhsb[kdx, neib]
 
                         _diff_flux(u, du, f, dfj, nf)

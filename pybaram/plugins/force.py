@@ -38,22 +38,25 @@ class ForcePlugin(BasePlugin):
         # Get idx, norm
         self._bcinfo = bcinfo = {}
 
-        bc = bcmap[suffix]
-        t, e, _ = bc._lidx
-        mag, vec = bc._mag_snorm, bc._vec_snorm
+        try:
+            bc = bcmap[suffix]
+            t, e, _ = bc._lidx
+            mag, vec = bc._mag_snorm, bc._vec_snorm
 
-        for i in np.unique(t):
-            mask = (t == i)
-            eidx = e[mask]
-            norm = vec[:, mask]*mag[mask]
+            for i in np.unique(t):
+                mask = (t == i)
+                eidx = e[mask]
+                norm = vec[:, mask]*mag[mask]
 
-            if intg.sys.name in ['euler']:
-                bcinfo[i] = (eidx, norm)
-                self.viscous = False
-            else:
-                dxn = np.linalg.norm(bc._dx_adj[:, mask], axis=0)/2
-                bcinfo[i] = (eidx, norm, dxn)
-                self.viscous = True
+                if intg.sys.name in ['euler']:
+                    bcinfo[i] = (eidx, norm)
+                    self.viscous = False
+                else:
+                    dxn = np.linalg.norm(bc._dx_adj[:, mask], axis=0)/2
+                    bcinfo[i] = (eidx, norm, dxn)
+                    self.viscous = True
+        except:
+            self.viscous = False
 
         # Get integration mode
         self.mode = intg.mode

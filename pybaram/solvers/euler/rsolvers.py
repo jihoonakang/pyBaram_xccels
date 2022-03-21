@@ -7,26 +7,27 @@ import numba as nb
 import re
 
 
-def get_rsolver(name, ndims, nvars, gamma, pmin, **kwargs):
+def get_rsolver(name, be, cplargs):
     """
     docstring
     """
     fname = re.sub('\+', 'p', name)
-    prepare, flux = eval('make_' + fname)(ndims, nvars, gamma, pmin)
+    prepare, flux = eval('make_' + fname)(cplargs)
 
-    return prepare, flux
+    return be.compile(prepare), be.compile(flux)
 
 
-def make_rusanov(ndims, nvars, gamma, pmin):
-    @nb.jit(nopython=True, fastmath=True)
+def make_rusanov(cplargs):
+    nvars, gamma = cplargs['nvars'], cplargs['gamma']
+    flux = cplargs['flux']
+
     def prepare():
         fl, fr = np.empty(nvars), np.empty(nvars)
         return fl, fr
 
-    @nb.jit(nopython=True, fastmath=True)
     def rsolver(ul, ur, nf, fn, fl, fr):
-        pl, contravl = flux(ul, nf, fl, ndims, nvars, gamma, pmin)
-        pr, contravr = flux(ur, nf, fr, ndims, nvars, gamma, pmin)
+        pl, contravl = flux(ul, nf, fl)
+        pr, contravr = flux(ur, nf, fr)
 
         contrav = 0.5*(contravl + contravr)
         an = np.sqrt(gamma*(pl+pr) / (ul[0] + ur[0])) + np.abs(contrav)
@@ -37,8 +38,10 @@ def make_rusanov(ndims, nvars, gamma, pmin):
     return prepare, rsolver
 
 
-def make_roem(ndims, nvars, gamma, pmin):
-    @nb.jit(nopython=True, fastmath=True)
+def make_roem(cplargs):
+    ndims, nvars, gamma = cplargs['ndims'], cplargs['nvars'], cplargs['gamma']
+    flux = cplargs['flux']
+
     def prepare():
         fl, fr = np.empty(nvars), np.empty(nvars)
         vl, vr = np.empty(ndims), np.empty(ndims)
@@ -46,10 +49,9 @@ def make_roem(ndims, nvars, gamma, pmin):
         du, bdq = np.empty(nvars), np.empty(nvars)
         return fl, fr, vl, vr, dv, va, du, bdq
 
-    @nb.jit(nopython=True, fastmath=True)
     def rsolver(ul, ur, nf, fn, fl, fr, vl, vr, dv, va, du, bdq):
-        pl, contravl = flux(ul, nf, fl, ndims, nvars, gamma, pmin)
-        pr, contravr = flux(ur, nf, fr, ndims, nvars, gamma, pmin)
+        pl, contravl = flux(ul, nf, fl)
+        pr, contravr = flux(ur, nf, fr)
 
         # Specific enthalpy, contra velocity for left / right
         for jdx in range(ndims):
@@ -122,8 +124,10 @@ def make_roem(ndims, nvars, gamma, pmin):
     return prepare, rsolver
 
 
-def make_hllem(ndims, nvars, gamma, pmin):
-    @nb.jit(nopython=True, fastmath=True)
+def make_hllem(cplargs):
+    ndims, nvars, gamma = cplargs['ndims'], cplargs['nvars'], cplargs['gamma']
+    flux = cplargs['flux']
+
     def prepare():
         fl, fr = np.empty(nvars), np.empty(nvars)
         vl, vr = np.empty(ndims), np.empty(ndims)
@@ -131,10 +135,9 @@ def make_hllem(ndims, nvars, gamma, pmin):
         df = np.empty(nvars)
         return fl, fr, vl, vr, dv, va, df
 
-    @nb.jit(nopython=True, fastmath=True)
     def rsolver(ul, ur, nf, fn, fl, fr, vl, vr, dv, va, df):
-        pl, contravl = flux(ul, nf, fl, ndims, nvars, gamma, pmin)
-        pr, contravr = flux(ur, nf, fr, ndims, nvars, gamma, pmin)
+        pl, contravl = flux(ul, nf, fl)
+        pr, contravr = flux(ur, nf, fr)
 
         # Specific enthalpy, contra velocity for left / right
         for jdx in range(ndims):
@@ -200,18 +203,19 @@ def make_hllem(ndims, nvars, gamma, pmin):
     return prepare, rsolver
 
 
-def make_ausmpwp(ndims, nvars, gamma, pmin):
+def make_ausmpwp(cplargs):
+    ndims, nvars, gamma = cplargs['ndims'], cplargs['nvars'], cplargs['gamma']
+    to_primevars = cplargs['to_primevars']
+
     alpha = 3/16
 
-    @nb.jit(nopython=True, fastmath=True)
     def prepare():
         vl, vr = np.empty(ndims), np.empty(ndims)
         return vl, vr
 
-    @nb.jit(nopython=True, fastmath=True)
     def rsolver(ul, ur, nf, fn, vl, vr):
-        pl = to_primevars(ul, vl, ndims, nvars, gamma, pmin)
-        pr = to_primevars(ur, vr, ndims, nvars, gamma, pmin)
+        pl = to_primevars(ul, vl)
+        pr = to_primevars(ur, vr)
 
         # Specific enthalpy, contra velocity, tangential velocity for left / right
         hl = (ul[nvars-1] + pl)/ul[0]
@@ -293,19 +297,20 @@ def make_ausmpwp(ndims, nvars, gamma, pmin):
     return prepare, rsolver
 
 
-def make_ausmpup(ndims, nvars, gamma, pmin):
+def make_ausmpup(cplargs):
+    ndims, nvars, gamma = cplargs['ndims'], cplargs['nvars'], cplargs['gamma']
+    to_primevars = cplargs['to_primevars']
+
     alpha, beta = 3/16, 1/8
     kp, ku = 1, 1
 
-    @nb.jit(nopython=True, fastmath=True)
     def prepare():
         vl, vr = np.empty(ndims), np.empty(ndims)
         return vl, vr
 
-    @nb.jit(nopython=True, fastmath=True)
     def rsolver(ul, ur, nf, fn, vl, vr):
-        pl = to_primevars(ul, vl, ndims, nvars, gamma, pmin)
-        pr = to_primevars(ur, vr, ndims, nvars, gamma, pmin)
+        pl = to_primevars(ul, vl)
+        pr = to_primevars(ur, vr)
 
         # Specific enthalpy, contra velocity, tangential velocity for left / right
         hl = (ul[nvars-1] + pl)/ul[0]
@@ -363,39 +368,3 @@ def make_ausmpup(ndims, nvars, gamma, pmin):
         fn[nvars - 1] = cmid*(mp*ul[0]*hl + mm*ur[0]*hr)
 
     return prepare, rsolver
-
-
-@nb.jit(nopython=True, fastmath=True)
-def flux(u, nf, f, ndims, nvars, gamma=1.4, pmin=eps):
-    rho, et = u[0], u[nvars-1]
-
-    contrav = dot(u, nf, ndims, 1)/rho
-
-    p = (gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho)
-    if p < pmin:
-        p = pmin
-        u[nvars - 1] = et = p/(gamma-1) + 0.5*dot(u, u, ndims, 1, 1)/rho
-
-    ht = et + p
-
-    f[0] = rho*contrav
-    for i in range(ndims):
-        f[i + 1] = u[i + 1]*contrav + nf[i]*p
-    f[nvars-1] = ht*contrav
-
-    return p, contrav
-
-
-@nb.jit(nopython=True, fastmath=True)
-def to_primevars(u, v, ndims, nvars, gamma=1.4, pmin=eps):
-    rho, et = u[0], u[nvars-1]
-
-    for i in range(ndims):
-        v[i] = u[i + 1] / rho
-
-    p = (gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho)
-    if p < pmin:
-        p = pmin
-        u[nvars - 1] = p/(gamma-1) + 0.5*dot(u, u, ndims, 1, 1)/rho
-
-    return p

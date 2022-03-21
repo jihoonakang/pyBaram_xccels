@@ -13,24 +13,29 @@ class EulerIntInters(BaseAdvecIntInters):
         rt, re, rf = self._ridx
         nf, sf = self._vec_snorm, self._mag_snorm
 
+        # Compile Arguments
+        cplargs = {
+            'flux' : self.ele0.inviscid_flux_container(),
+            'to_primevars' : self.ele0.to_flow_primevars(),
+            'ndims' : ndims,
+            'nvars' : nvars,
+            **self._const
+        }
+
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, ndims, nvars, **self._const)
+        pre, flux = get_rsolver(scheme, self.be, cplargs)
 
         def comm_flux(i_begin, i_end, *uf):
-            ul, ur = np.empty(nvars), np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
-            nfi = np.empty(ndims)
 
             for idx in range(i_begin, i_end):
-                for jdx in range(ndims):
-                    nfi[jdx] = nf[jdx, idx]
+                nfi = nf[:, idx]
 
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 rti, rfi, rei = rt[idx], rf[idx], re[idx]
-                for jdx in range(nvars):
-                    ul[jdx] = uf[lti][lfi, jdx, lei]
-                    ur[jdx] = uf[rti][rfi, jdx, rei]
+                ul = uf[lti][lfi, :, lei]
+                ur = uf[rti][rfi, :, rei]
 
                 flux(ul, ur, nfi, fn, *ftmp)
 
@@ -47,23 +52,28 @@ class EulerMPIInters(BaseAdvecMPIInters):
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm
 
+        # Compile Arguments
+        cplargs = {
+            'flux' : self.ele0.inviscid_flux_container(),
+            'to_primevars' : self.ele0.to_flow_primevars(),
+            'ndims' : ndims,
+            'nvars' : nvars,
+            **self._const
+        }
+
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, ndims, nvars, **self._const)
+        pre, flux = get_rsolver(scheme, self.be, cplargs)
 
         def comm_flux(i_begin, i_end, rhs, *uf):
-            ul, ur = np.empty(nvars), np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
-            nfi = np.empty(ndims)
 
             for idx in range(i_begin, i_end):
-                for jdx in range(ndims):
-                    nfi[jdx] = nf[jdx, idx]
+                nfi = nf[:, idx]
 
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
-                for jdx in range(nvars):
-                    ul[jdx] = uf[lti][lfi, jdx, lei]
-                    ur[jdx] = rhs[jdx, idx]
+                ul = uf[lti][lfi, :, lei]
+                ur = rhs[:, idx]
 
                 flux(ul, ur, nfi, fn, *ftmp)
 
@@ -79,8 +89,17 @@ class EulerBCInters(BaseAdvecBCInters):
     def _make_flux(self):
         ndims, nvars = self.ndims, self.nvars
 
+        # Compile Arguments
+        cplargs = {
+            'flux' : self.ele0.inviscid_flux_container(),
+            'to_primevars' : self.ele0.to_flow_primevars(),
+            'ndims' : ndims,
+            'nvars' : nvars,
+            **self._const
+        }
+
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, ndims, nvars, **self._const)
+        pre, flux = get_rsolver(scheme, self.be, cplargs)
 
         bc = self.bc
 
@@ -88,18 +107,15 @@ class EulerBCInters(BaseAdvecBCInters):
         nf, sf = self._vec_snorm, self._mag_snorm,
 
         def bc_flux(i_begin, i_end, *uf):
-            ul, ur = np.empty(nvars), np.empty(nvars)
+            ur = np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
-            nfi = np.empty(ndims)
 
             for idx in range(i_begin, i_end):
-                for jdx in range(ndims):
-                    nfi[jdx] = nf[jdx, idx]
+                nfi = nf[:, idx]
 
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
-                for jdx in range(nvars):
-                    ul[jdx] = uf[lti][lfi, jdx, lei]
+                ul = uf[lti][lfi, :, lei]
 
                 bc(ul, ur, nfi)
 
