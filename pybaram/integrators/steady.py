@@ -227,7 +227,10 @@ class LUSGS(BaseSteadyIntegrator):
         be = self.be
 
         # Assign LU-SGS
-        for ele in self.sys.eles:             
+        for ele in self.sys.eles:      
+            # Get reordering result
+            mapping, unmapping = ele.reordering()
+
             # diagonal and lambda array
             diag = np.empty(ele.neles)
             lambdaf = np.empty((ele.nface, ele.neles))
@@ -237,7 +240,9 @@ class LUSGS(BaseSteadyIntegrator):
 
             # Make LU-SGS
             _pre_lusgs, _update = make_lusgs_common(ele, _lambdaf, factor=1.0)
-            _lsweep, _usweep = make_serial_lusgs(be, ele, _flux)
+            _lsweep, _usweep = make_serial_lusgs(
+                be, ele, mapping, unmapping, _flux
+            )
 
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 

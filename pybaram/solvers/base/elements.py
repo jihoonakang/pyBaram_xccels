@@ -78,6 +78,32 @@ class BaseElements:
         icolor = np.concatenate([ele_idx[color==i] for i in range(max_color+1)])
         return ncolor, icolor, color
 
+    def reordering(self):
+        try:
+            # Use Scipy sparse packages
+            from scipy import sparse
+            from scipy.sparse.csgraph import reverse_cuthill_mckee
+
+            # Convert nei_ele to csr sparse matrix
+            mask = self.nei_ele > 0
+            index = (np.ones(self.nface, dtype=int)[:, None]* np.arange(self.neles)[None, :])
+
+            col = np.concatenate([index[mask], np.arange(self.neles)])
+            row = np.concatenate([self.nei_ele[mask], np.arange(self.neles)])
+            data = np.ones_like(row)
+
+            mtx = sparse.csr_matrix((data, (row, col)), shape=(self.neles, self.neles))
+
+            # reverse Cuthill MacKee reordering
+            mapping = reverse_cuthill_mckee(mtx)
+            unmapping = np.argsort(mapping)
+
+        except:
+            mapping = np.arange(self.neles, dtype=int)
+            unmapping = np.arange(self.neles, dtype=int)
+
+        return mapping, unmapping
+
     def set_ics_from_cfg(self):
         xc = self.geom.xc(self.eles).T
 

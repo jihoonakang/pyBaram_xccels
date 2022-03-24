@@ -62,7 +62,7 @@ def make_lusgs_common(ele, _lambdaf, factor=1.0):
     return _pre_lusgs, _update
 
 
-def make_serial_lusgs(be, ele, _flux):
+def make_serial_lusgs(be, ele, mapping, unmapping, _flux):
     # dimensions
     nvars, nface = ele.nvars, ele.nface
 
@@ -81,7 +81,9 @@ def make_serial_lusgs(be, ele, _flux):
         dfj = np.zeros(nvars)
         df = np.zeros(nvars)
 
-        for idx in range(i_begin, i_end):
+        for _idx in range(i_begin, i_end):
+            idx = mapping[_idx]
+
             for kdx in range(nvars):
                 df[kdx] = 0.0
 
@@ -89,7 +91,7 @@ def make_serial_lusgs(be, ele, _flux):
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
-                if neib > -1 and neib < idx:
+                if neib > -1 and unmapping[neib] < _idx:
                     u = uptsb[:, neib]
                     for kdx in range(nvars):
                         du[kdx] = dub[kdx, neib]
@@ -111,7 +113,9 @@ def make_serial_lusgs(be, ele, _flux):
         df = np.zeros(nvars)
 
         # Upper sweep (backward)
-        for idx in range(i_end-1, i_begin-1, -1):
+        for _idx in range(i_end-1, i_begin-1, -1):
+            idx = mapping[_idx]
+
             for kdx in range(nvars):
                 df[kdx] = 0.0
 
@@ -119,7 +123,7 @@ def make_serial_lusgs(be, ele, _flux):
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
-                if neib > idx:
+                if neib > -1 and unmapping[neib] > _idx:
                     u = uptsb[:, neib]
                     for kdx in range(nvars):
                         du[kdx] = rhsb[kdx, neib]
