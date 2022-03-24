@@ -17,7 +17,9 @@ modules = ['pybaram.backends',
            'pybaram.solvers',
            'pybaram.solvers.base',
            'pybaram.solvers.baseadvec',
+           'pybaram.solvers.baseadvecdiff',
            'pybaram.solvers.euler',
+           'pybaram.solvers.navierstokes',
            'pybaram.utils',
            'pybaram.writers'
            ]

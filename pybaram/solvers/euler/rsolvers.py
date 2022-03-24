@@ -3,7 +3,6 @@ from pybaram.utils.nb import dot
 from pybaram.utils.np import eps
 
 import numpy as np
-import numba as nb
 import re
 
 

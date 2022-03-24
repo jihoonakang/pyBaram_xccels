@@ -11,8 +11,6 @@ class BaseAdvecElements(BaseElements):
     def construct_kernels(self, vertex, xw, nreg):
         self.vertex = vertex
 
-        self.coloring()    
-
         # Upts : Solution vector
         self.upts = upts = [self._ics.copy() for i in range(nreg)]
         del(self._ics)
@@ -212,8 +210,6 @@ class BaseAdvecElements(BaseElements):
         return self.be.make_loop(self.neles, _cal_mlp_u)
 
     def _make_post(self):
-        neles = self.neles
-
         _fix_nonPys = self.fix_nonPys_container()
 
         def post(i_begin, i_end, upts):
@@ -221,4 +217,4 @@ class BaseAdvecElements(BaseElements):
             for idx in range(i_begin, i_end):
                 _fix_nonPys(upts[:, idx])
 
-        return self.be.make_loop(neles, post)
+        return self.be.make_loop(self.neles, post)

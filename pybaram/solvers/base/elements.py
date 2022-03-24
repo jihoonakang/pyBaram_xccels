@@ -40,11 +40,9 @@ class BaseElements:
         max_color = 1
         is_colored = np.empty(32, dtype=np.int)
 
-        # Assign initial color
-        color[0] = 1
-
-        # Search Coloring
-        for idx in range(1, self.neles):
+        # Search Coloring (Search along hyperplane)
+        xn = np.sum(self.xc, axis=1)
+        for idx in np.argsort(xn):
             # 이 컬러 번호가 주변에 있는지 확인용 자료
             is_colored[:max_color+1] = 0
 

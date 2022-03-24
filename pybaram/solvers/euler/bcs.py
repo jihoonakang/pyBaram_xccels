@@ -2,16 +2,16 @@
 from pybaram.utils.nb import dot
 
 import numpy as np
-import numba as nb
 
 
-def get_bc(self, name, *args, **kwargs):
+def get_bc(self, name, bcargs):
     bc = eval('make_bc_'+name)
-    return bc(*args, **kwargs)
+    return bc(bcargs)
 
 
-def make_bc_sup_out(ndims, nvars, *args, **kwargs):
-    @nb.jit(nopython=True, fastmath=True)
+def make_bc_sup_out(bcargs):
+    nvars = bcargs['nvars']
+
     def bc(ul, ur, nf):
         for idx in range(nvars):
             ur[idx] = ul[idx]
@@ -19,16 +19,19 @@ def make_bc_sup_out(ndims, nvars, *args, **kwargs):
     return bc
 
 
-def make_bc_sup_in(ndims, nvars, *args, gamma, rho, p, u, v, w=0.0, **kwargs):
+def make_bc_sup_in(bcargs):
+    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    gamma = bcargs['gamma']
+    rho, p = bcargs['rho'], bcargs['p']
+
     # Conservative variable at boundary
     ub = np.empty(nvars)
     ub[0] = rho
-    for i, k in enumerate([u, v, w][:ndims]):
-        ub[i+1] = rho*k
+    for i, k in enumerate('uvw'[:ndims]):
+        ub[i+1] = rho*bcargs[k]
 
     ub[nvars-1] = p/(gamma-1) + 0.5*sum(ub[1:-1]**2)/rho
 
-    @nb.jit(nopython=True, fastmath=True)
     def bc(ul, ur, nf):
         for idx in range(nvars):
             ur[idx] = ub[idx]
@@ -36,16 +39,19 @@ def make_bc_sup_in(ndims, nvars, *args, gamma, rho, p, u, v, w=0.0, **kwargs):
     return bc
 
 
-def make_bc_sub_inv(ndims, nvars, *args, gamma, pmin, rho, u, v, w=0, **kwargs):
+def make_bc_sub_inv(bcargs):
+    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    gamma = bcargs['gamma']
+    rho, pmin = bcargs['rho'], bcargs['pmin']
+
     # Conservative variable at boundary
     ub = np.empty(nvars-1)
     ub[0] = rho
-    for i, k in enumerate([u, v, w][:ndims]):
-        ub[i+1] = rho*k
+    for i, k in enumerate('uvw'[:ndims]):
+        ub[i+1] = rho*bcargs[k]
 
     qb = 0.5*dot(ub, ub, ndims, 1, 1) / ub[0]
 
-    @nb.jit(nopython=True, fastmath=True)
     def bc(ul, ur, nf):
         for idx in range(nvars-1):
             ur[idx] = ub[idx]
@@ -57,8 +63,10 @@ def make_bc_sub_inv(ndims, nvars, *args, gamma, pmin, rho, u, v, w=0, **kwargs):
     return bc
 
 
-def make_bc_sub_outp(ndims, nvars, *args, gamma, p, **kwargs):
-    @nb.jit(nopython=True, fastmath=True)
+def make_bc_sub_outp(bcargs):
+    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    gamma, p = bcargs['gamma'], bcargs['p']
+
     def bc(ul, ur, nf):
         for idx in range(nvars-1):
             ur[idx] = ul[idx]
@@ -68,8 +76,9 @@ def make_bc_sub_outp(ndims, nvars, *args, gamma, p, **kwargs):
     return bc
 
 
-def make_bc_slip_wall(ndims, nvars, *args, **kwargs):
-    @nb.jit(nopython=True, fastmath=True)
+def make_bc_slip_wall(bcargs):
+    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+
     def bc(ul, ur, nf):
         vn = dot(ul, nf, ndims, 1)
         ur[0] = ul[0]
@@ -82,14 +91,17 @@ def make_bc_slip_wall(ndims, nvars, *args, **kwargs):
     return bc
 
 
-def make_bc_far(ndims, nvars, *args, gamma, pmin, rho, p, u, v, w=0.0, **kwargs):
+def make_bc_far(bcargs):
+    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    gamma, pmin = bcargs['gamma'], bcargs['pmin']
+    rho, p = bcargs['rho'], bcargs['p']
+
     # Speed of sound, entropy at bc
     cb = np.sqrt(gamma*p/rho)
     sb = p / rho**gamma
     cb_gmo = 2*cb/(gamma-1)
-    vb = np.array([u, v, w])[:ndims]
+    vb = np.array([bcargs[k] for k in 'uvw'[:ndims]])
 
-    @nb.jit(nopython=True, fastmath=True)
     def bc(ul, ur, nf):
         # Contravariant velocity
         contrab = dot(vb, nf, ndims)

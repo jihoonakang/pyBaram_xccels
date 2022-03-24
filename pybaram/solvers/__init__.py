@@ -2,6 +2,7 @@
 from pybaram.solvers.base.system import BaseSystem
 from pybaram.solvers.euler.system import EulerSystem
 from pybaram.solvers.euler.elements import FluidElements
+from pybaram.solvers.navierstokes.system import NavierStokeSystem
 from pybaram.utils.misc import subclass_by_name
 
 

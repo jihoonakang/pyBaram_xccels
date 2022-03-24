@@ -119,7 +119,6 @@ class BaseAdvecBCInters(BaseBCInters):
     def construct_bc(self):
         # BC 함수
         bcf = re.sub('-', '_', self.name)
-        ndims, nvars = self.ndims, self.nvars
 
         # BC constant
         if self._reqs:
@@ -129,9 +128,11 @@ class BaseAdvecBCInters(BaseBCInters):
         else:
             bcc = {}
 
+        bcc['ndims'], bcc['nvars'] = self.ndims, self.nvars
+
         bcc.update(self._const)
 
-        self.bc = self._get_bc(bcf, ndims, nvars, **bcc)
+        self.bc = self.be.compile(self._get_bc(bcf, bcc))
 
     def construct_kernels(self, elemap):
         self.construct_bc()

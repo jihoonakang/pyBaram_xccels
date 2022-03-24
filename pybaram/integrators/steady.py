@@ -144,6 +144,8 @@ class EulerExplicit(BaseSteadyIntegrator):
         resid = self.rhs(0, 1, is_norm=True)
         stages[0]()
 
+        self.sys.post(0)
+
         return 0, resid
 
 
@@ -169,6 +171,8 @@ class TVDRK3(BaseSteadyIntegrator):
 
         resid = self.rhs(2, 1, is_norm=True)
         stages[2]()
+
+        self.sys.post(0)
 
         return 0, resid
 
@@ -208,6 +212,8 @@ class FiveStageRK(BaseSteadyIntegrator):
         resid = self.rhs(2, 1, is_norm=True)
         stages[4]()
 
+        self.sys.post(0)
+
         return 0, resid
  
 
@@ -216,7 +222,55 @@ class LUSGS(BaseSteadyIntegrator):
     nreg = 3
 
     def construct_stages(self):
-        from pybaram.integrators.lusgs import make_lusgs
+        from pybaram.integrators.lusgs import make_lusgs_common, make_serial_lusgs
+
+        be = self.be
+
+        # Assign LU-SGS
+        for ele in self.sys.eles:             
+            # diagonal and lambda array
+            diag = np.empty(ele.neles)
+            lambdaf = np.empty((ele.nface, ele.neles))
+
+            _flux = ele.flux_container()
+            _lambdaf = ele.make_wave_speed()
+
+            # Make LU-SGS
+            _pre_lusgs, _update = make_lusgs_common(ele, _lambdaf, factor=1.0)
+            _lsweep, _usweep = make_serial_lusgs(be, ele, _flux)
+
+            pre_lusgs = Kernel(
+                be.make_loop(ele.neles, _pre_lusgs), 
+                ele.upts[0], ele.dt, diag, lambdaf
+            )
+            
+            lsweeps = Kernel(be.make_loop(ele.neles, func=_lsweep),
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf) 
+
+            usweeps = Kernel(be.make_loop(ele.neles, func=_usweep),
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf) 
+
+            ele.lusgs = MetaKernel((pre_lusgs, lsweeps, usweeps))
+            ele.update = Kernel(be.make_loop(ele.neles, _update),
+                ele.upts[0], ele.upts[1]
+            )
+    
+    def step(self):
+        resid = self.rhs(0, 1, is_norm=True)
+        self.sys.eles.lusgs()
+        self.sys.eles.update()
+
+        self.sys.post(0)
+
+        return 0, resid
+
+
+class ColoredLUSGS(BaseSteadyIntegrator):
+    name = 'colored-lu-sgs'
+    nreg = 3
+
+    def construct_stages(self):
+        from pybaram.integrators.lusgs import make_lusgs_common, make_colored_lusgs
 
         be = self.be
 
@@ -233,8 +287,9 @@ class LUSGS(BaseSteadyIntegrator):
             _lambdaf = ele.make_wave_speed()
 
             # Make LU-SGS
-            _pre_lusgs, _lsweep, _usweep, _update = make_lusgs(
-                be, ele, icolor, lev_color, _flux, _lambdaf, factor=1.0
+            _pre_lusgs, _update = make_lusgs_common(ele, _lambdaf, factor=1.0)
+            _lsweep, _usweep = make_colored_lusgs(
+                be, ele, icolor, lev_color, _flux
             )
 
             pre_lusgs = Kernel(
@@ -266,10 +321,11 @@ class LUSGS(BaseSteadyIntegrator):
         self.sys.eles.lusgs()
         self.sys.eles.update()
 
+        self.sys.post(0)
+
         return 0, resid
 
-                
-
+            
 
 
 

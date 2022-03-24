@@ -15,19 +15,16 @@ def make_diff_flux(nvars, fluxf):
     return _diff_flux
 
 
-def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
+def make_lusgs_common(ele, _lambdaf, factor=1.0):
     # dimensions
-    nvars, ndims, nface, neles = ele.nvars, ele.ndims, ele.nface, ele.neles
-    
+    nvars, nface = ele.nvars, ele.nface
+
     # Vectors
     fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
     dxc = np.linalg.norm(ele.dxc, axis=2)
 
     # index
     nei_ele = ele.nei_ele
-
-    # Pre-compile functions
-    _diff_flux = be.compile(make_diff_flux(nvars, _flux))
 
     def _pre_lusgs(i_begin, i_end, uptsb, dt, diag, lambdaf):
         # Construct Matrix
@@ -56,6 +53,103 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
                 lambdaf[jdx, idx] = lamf
                 diag[idx] += 0.5*lamf*fnorm_vol[jdx, idx]
 
+    def _update(i_begin, i_end, uptsb, rhsb):
+        # Update
+        for idx in range(i_begin, i_end):
+            for kdx in range(nvars):
+                uptsb[kdx, idx] += rhsb[kdx, idx]
+
+    return _pre_lusgs, _update
+
+
+def make_serial_lusgs(be, ele, _flux):
+    # dimensions
+    nvars, nface = ele.nvars, ele.nface
+
+    # Vectors
+    fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
+
+    # index
+    nei_ele = ele.nei_ele
+
+    # Pre-compile functions
+    _diff_flux = be.compile(make_diff_flux(nvars, _flux))
+
+    def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
+        du = np.zeros(nvars)
+        f = np.zeros(nvars)
+        dfj = np.zeros(nvars)
+        df = np.zeros(nvars)
+
+        for idx in range(i_begin, i_end):
+            for kdx in range(nvars):
+                df[kdx] = 0.0
+
+            for jdx in range(nface):
+                nf = vec_fnorm[jdx, :, idx]
+
+                neib = nei_ele[jdx, idx]
+                if neib > -1 and neib < idx:
+                    u = uptsb[:, neib]
+                    for kdx in range(nvars):
+                        du[kdx] = dub[kdx, neib]
+
+                    _diff_flux(u, du, f, dfj, nf)
+
+                    for kdx in range(0, nvars):
+                        df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
+                                    * dub[kdx, neib])*fnorm_vol[jdx, idx]
+
+            for kdx in range(0, nvars):
+                dub[kdx, idx] = (rhsb[kdx, idx] -
+                                       0.5*df[kdx])/diag[idx]
+
+    def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
+        du = np.zeros(nvars)
+        f = np.zeros(nvars)
+        dfj = np.zeros(nvars)
+        df = np.zeros(nvars)
+
+        # Upper sweep (backward)
+        for idx in range(i_end-1, i_begin-1, -1):
+            for kdx in range(nvars):
+                df[kdx] = 0.0
+
+            for jdx in range(nface):
+                nf = vec_fnorm[jdx, :, idx]
+
+                neib = nei_ele[jdx, idx]
+                if neib > idx:
+                    u = uptsb[:, neib]
+                    for kdx in range(nvars):
+                        du[kdx] = rhsb[kdx, neib]
+
+                    _diff_flux(u, du, f, dfj, nf)
+
+                    for kdx in range(0, nvars):
+                        df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
+                                    * rhsb[kdx, neib])*fnorm_vol[jdx, idx]
+
+            for kdx in range(0, nvars):
+                rhsb[kdx, idx] = dub[kdx, idx] - \
+                    0.5*df[kdx]/diag[idx]
+
+    return _lower_sweep, _upper_sweep
+
+
+def make_colored_lusgs(be, ele, icolor, lcolor, _flux):
+    # dimensions
+    nvars, nface = ele.nvars, ele.nface
+
+    # Vectors
+    fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
+
+    # Pre-compile functions
+    _diff_flux = be.compile(make_diff_flux(nvars, _flux))
+
+    # index
+    nei_ele = ele.nei_ele
+
     def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
         du = np.zeros(nvars)
         f = np.zeros(nvars)
@@ -76,6 +170,7 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
                 neib = nei_ele[jdx, idx]
                 if neib > -1:
                     if lcolor[neib] < curr_level:
+                    #if neib < idx:
                         u = uptsb[:, neib]
                         for kdx in range(nvars):
                             du[kdx] = dub[kdx, neib]
@@ -97,7 +192,8 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
         df = np.zeros(nvars)
 
         # Upper sweep (backward)
-        for _idx in range(i_end-1, i_begin-1, -1):
+        #for _idx in range(i_end-1, i_begin-1, -1):
+        for _idx in range(i_begin, i_end):
             idx = icolor[_idx]
             curr_level = lcolor[idx]
 
@@ -124,11 +220,4 @@ def make_lusgs(be, ele, icolor, lcolor, _flux, _lambdaf, factor=1.0):
                 rhsb[kdx, idx] = dub[kdx, idx] - \
                     0.5*df[kdx]/diag[idx]
 
-    def _update(i_begin, i_end, uptsb, rhsb):
-        # Update
-        for idx in range(i_begin, i_end):
-            for kdx in range(nvars):
-                uptsb[kdx, idx] += rhsb[kdx, idx]
-
-    return _pre_lusgs, _lower_sweep, _upper_sweep, _update
-
+    return _lower_sweep, _upper_sweep

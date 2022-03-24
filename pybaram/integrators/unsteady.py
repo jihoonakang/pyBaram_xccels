@@ -113,6 +113,8 @@ class EulerExplicit(BaseUnsteadyIntegrator):
         sys.rhside()
         stages[0](dt)
 
+        self.sys.post(0)
+
         return 0
 
 
@@ -138,5 +140,7 @@ class TVDRK3(BaseUnsteadyIntegrator):
 
         sys.rhside(2, 1, t=t)
         stages[2](dt)
+        
+        self.sys.post(0)
 
         return 0
