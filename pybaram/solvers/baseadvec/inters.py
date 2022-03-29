@@ -128,7 +128,7 @@ class BaseAdvecBCInters(BaseBCInters):
         else:
             bcc = {}
 
-        bcc['ndims'], bcc['nvars'] = self.ndims, self.nvars
+        bcc['ndims'], bcc['nvars'], bcc['nfvars'] = self.ndims, self.nvars, self.nfvars
 
         bcc.update(self._const)
 

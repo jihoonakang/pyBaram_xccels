@@ -5,7 +5,6 @@ from pybaram.backends.types import Kernel
 from pybaram.utils.nb import dot
 
 import numpy as np
-import numba as nb
 
 
 class ViscousFluidElements(FluidElements):
@@ -15,28 +14,24 @@ class ViscousFluidElements(FluidElements):
     def auxvars(self):
         return ['mu']
 
-    def mu_container_py(self):
+    def mu_container(self):
         mu = self._const['mu']
 
         # Constant viscosity
         def compute_mu(*args):
             return mu
 
-        return compute_mu
-
-    def mu_container(self):
-        # Jitted function
-        compute_mu_py = self.mu_container_py()
-        return self.be.compile(compute_mu_py)
+        return self.be.compile(compute_mu)
 
 
 class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
     def __init__(self, be, cfg, name, eles, vcon):
         super().__init__(be, cfg, name, eles, vcon)
         self.nvars = len(self.primevars)
+        self.nfvars = self.nvars
 
         # Constants
-        cfg.get('constants', 'pmin', '1e-4')
+        cfg.get('constants', 'pmin', '1e-15')
         self._const = cfg.items('constants')
 
     def construct_kernels(self, vertex, xw, nreg):
@@ -47,10 +42,11 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         self.mu = aux[0]
 
         self.post.update_args(self.upts_in, self.mu)
+        self.post()
 
-        # Gradient at face
+        # Timestep
         self.timestep = Kernel(self._make_timestep(),
-                               self.upts_in, self.dt)
+                               self.upts_in, self.mu, self.dt)
 
     def _make_timestep(self):
         ndims, nface = self.ndims, self.nface
@@ -58,10 +54,8 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         smag, svec = self._gen_snorm_fpts()
         gamma, pmin = self._const['gamma'], self._const['pmin']
         pr = self._const['pr']
-        
-        compute_mu = self.mu_container()
 
-        def timestep(i_begin, i_end, u, dt, cfl):
+        def timestep(i_begin, i_end, u, mu, dt, cfl):
             for idx in range(i_begin, i_end):
                 rho = u[0, idx]
                 et = u[-1, idx]
@@ -70,12 +64,10 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
                 p = max((gamma - 1)*(et - 0.5*rv2), pmin)
                 c = np.sqrt(gamma*p/rho)
 
-                mu = compute_mu(u[:, idx])
-
                 sum_lamdf = 0.0
                 for jdx in range(nface):
                     lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1)) + c
-                    lamdf += (1/rho*max(4/3, gamma)*mu/pr *
+                    lamdf += (1/rho*max(4/3, gamma)*mu[idx]/pr *
                               smag[jdx, idx]/vol[idx])
                     sum_lamdf += lamdf*smag[jdx, idx]
 
@@ -84,22 +76,18 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         return self.be.make_loop(self.neles, timestep)
 
     def make_wave_speed(self):
-        ndims, nvars = self.ndims, self.nvars
+        ndims, nfvars = self.ndims, self.nfvars
         gamma, pmin = self._const['gamma'], self._const['pmin']
         pr = self._const['pr']
 
-        compute_mu = self.mu_container()
-
-        def _lambdaf(u, nf, dx):
-            rho, et = u[0], u[nvars-1]
+        def _lambdaf(u, nf, dx, idx, mu):
+            rho, et = u[0], u[nfvars-1]
 
             contra = dot(u, nf, ndims, 1)/rho
             p = max((gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho), pmin)
             c = np.sqrt(gamma*p/rho)
 
-            mu = compute_mu(u)
-
-            return abs(contra) + c + 1/dx/rho * max(4/3, gamma)*mu/pr
+            return abs(contra) + c + 1/dx/rho * max(4/3, gamma)*mu[idx]/pr
 
         return self.be.compile(_lambdaf)
 

@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 def make_visflux(be, cplargs):
-    compute_mu = cplargs['compute_mu']
     ndims = cplargs['ndims']
     gamma, pr = cplargs['gamma'], cplargs['pr']
 
-    def visflux2d(uf, gf, nf, fn):
+    def visflux2d(uf, gf, nf, mu, fn):
         inv_rho = 1/uf[0]
         u = uf[1]*inv_rho
         v = uf[2]*inv_rho
@@ -27,7 +26,6 @@ def make_visflux(be, cplargs):
         t_y = inv_rho*(e_y - (inv_rho*rho_y*e + u*u_y + v*v_y))
 
         # Stress tensor
-        mu = compute_mu(uf)
         t_xx = 2*mu*inv_rho*(u_x - 1/3*(u_x + v_y))
         t_yy = 2*mu*inv_rho*(v_y - 1/3*(u_x + v_y))
         t_xy = mu*inv_rho*(v_x + u_y)
@@ -37,7 +35,7 @@ def make_visflux(be, cplargs):
         fn[3] -= nf[0]*(u*t_xx + v*t_xy + gamma*(mu/pr)*t_x) + \
             nf[1]*(u*t_xy + v*t_yy + gamma*(mu/pr)*t_y)
 
-    def visflux3d(uf, gf, nf, fn):
+    def visflux3d(uf, gf, nf, mu, fn):
         inv_rho = 1/uf[0]
         u = uf[1]*inv_rho
         v = uf[2]*inv_rho
@@ -71,7 +69,6 @@ def make_visflux(be, cplargs):
         t_z = inv_rho*(e_z - (inv_rho*rho_z*e + u*u_z + v*v_z + w*w_z))
 
         # Stress tensor
-        mu = compute_mu(uf)
         t_xx = 2*mu*inv_rho*(u_x - 1/3*(u_x + v_y + w_z))
         t_yy = 2*mu*inv_rho*(v_y - 1/3*(u_x + v_y + w_z))
         t_zz = 2*mu*inv_rho*(w_z - 1/3*(u_x + v_y + w_z))

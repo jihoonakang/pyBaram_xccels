@@ -17,7 +17,7 @@ def get_rsolver(name, be, cplargs):
 
 
 def make_rusanov(cplargs):
-    nvars, gamma = cplargs['nvars'], cplargs['gamma']
+    nvars, gamma = cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
 
     def prepare():
@@ -38,7 +38,7 @@ def make_rusanov(cplargs):
 
 
 def make_roem(cplargs):
-    ndims, nvars, gamma = cplargs['ndims'], cplargs['nvars'], cplargs['gamma']
+    ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
 
     def prepare():
@@ -124,7 +124,7 @@ def make_roem(cplargs):
 
 
 def make_hllem(cplargs):
-    ndims, nvars, gamma = cplargs['ndims'], cplargs['nvars'], cplargs['gamma']
+    ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
 
     def prepare():
@@ -203,7 +203,7 @@ def make_hllem(cplargs):
 
 
 def make_ausmpwp(cplargs):
-    ndims, nvars, gamma = cplargs['ndims'], cplargs['nvars'], cplargs['gamma']
+    ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     to_primevars = cplargs['to_primevars']
 
     alpha = 3/16
@@ -297,7 +297,7 @@ def make_ausmpwp(cplargs):
 
 
 def make_ausmpup(cplargs):
-    ndims, nvars, gamma = cplargs['ndims'], cplargs['nvars'], cplargs['gamma']
+    ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     to_primevars = cplargs['to_primevars']
 
     alpha, beta = 3/16, 1/8

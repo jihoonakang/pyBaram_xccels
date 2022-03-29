@@ -13,7 +13,7 @@ class BaseInters:
         # Dimension 저장
         self.nfpts = len(lhs)
         self.ele0 = ele0 = elemap[next(iter(elemap))]
-        self.ndims, self.nvars = ele0.ndims, ele0.nvars
+        self.ndims, self.nvars, self.nfvars = ele0.ndims, ele0.nvars, ele0.nfvars
         self.primevars = ele0.primevars
         self._const = cfg.items('constants')
 

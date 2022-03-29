@@ -250,10 +250,10 @@ class LUSGS(BaseSteadyIntegrator):
             )
             
             lsweeps = Kernel(be.make_loop(ele.neles, func=_lsweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf) 
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf) 
 
             usweeps = Kernel(be.make_loop(ele.neles, func=_usweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf) 
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf) 
 
             ele.lusgs = MetaKernel((pre_lusgs, lsweeps, usweeps))
             ele.update = Kernel(be.make_loop(ele.neles, _update),
@@ -299,19 +299,19 @@ class ColoredLUSGS(BaseSteadyIntegrator):
 
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 
-                ele.upts[0], ele.dt, diag, lambdaf
+                ele.upts[0], ele.dt, diag, lambdaf, ele.mu
             )
             
             lsweeps = [
                 Kernel(be.make_loop(n0=n0, ne=ne, func=_lsweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf
                 ) 
                 for n0, ne in zip(ncolor[:-1], ncolor[1:])
             ]
 
             usweeps = [
                 Kernel(be.make_loop(n0=n0, ne=ne, func=_usweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, lambdaf
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf
                 ) 
                 for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
             ]

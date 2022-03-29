@@ -10,7 +10,7 @@ def get_bc(self, name, bcargs):
 
 
 def make_bc_adia_wall(bcargs):
-    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
 
     def bc(ul, ur, nf):
         ur[0] = ul[0]
@@ -24,7 +24,7 @@ def make_bc_adia_wall(bcargs):
 
 
 def make_bc_isotherm_wall(bcargs):
-    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
     gamma = bcargs['gamma']
     pmin = bcargs['pmin']
 

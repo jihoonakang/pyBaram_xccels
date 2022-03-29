@@ -8,17 +8,17 @@ import numpy as np
 
 class EulerIntInters(BaseAdvecIntInters):
     def _make_flux(self):
-        ndims, nvars = self.ndims, self.nvars
+        ndims, nfvars = self.ndims, self.nfvars
         lt, le, lf = self._lidx
         rt, re, rf = self._ridx
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compile Arguments
         cplargs = {
-            'flux' : self.ele0.inviscid_flux_container(),
+            'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
-            'nvars' : nvars,
+            'nfvars' : nfvars,
             **self._const
         }
 
@@ -27,7 +27,7 @@ class EulerIntInters(BaseAdvecIntInters):
 
         def comm_flux(i_begin, i_end, *uf):
             ftmp = pre()
-            fn = np.empty(nvars)
+            fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
                 nfi = nf[:, idx]
@@ -39,7 +39,7 @@ class EulerIntInters(BaseAdvecIntInters):
 
                 flux(ul, ur, nfi, fn, *ftmp)
 
-                for jdx in range(nvars):
+                for jdx in range(nfvars):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
                     uf[rti][rfi, jdx, rei] = -fn[jdx]*sf[idx]
 
@@ -48,16 +48,16 @@ class EulerIntInters(BaseAdvecIntInters):
 
 class EulerMPIInters(BaseAdvecMPIInters):
     def _make_flux(self):
-        ndims, nvars = self.ndims, self.nvars
+        ndims, nfvars = self.ndims, self.nfvars
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compile Arguments
         cplargs = {
-            'flux' : self.ele0.inviscid_flux_container(),
+            'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
-            'nvars' : nvars,
+            'nfvars' : nfvars,
             **self._const
         }
 
@@ -66,7 +66,7 @@ class EulerMPIInters(BaseAdvecMPIInters):
 
         def comm_flux(i_begin, i_end, rhs, *uf):
             ftmp = pre()
-            fn = np.empty(nvars)
+            fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
                 nfi = nf[:, idx]
@@ -77,7 +77,7 @@ class EulerMPIInters(BaseAdvecMPIInters):
 
                 flux(ul, ur, nfi, fn, *ftmp)
 
-                for jdx in range(nvars):
+                for jdx in range(nfvars):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)
@@ -87,14 +87,14 @@ class EulerBCInters(BaseAdvecBCInters):
     _get_bc = get_bc
 
     def _make_flux(self):
-        ndims, nvars = self.ndims, self.nvars
+        ndims, nfvars = self.ndims, self.nfvars
 
         # Compile Arguments
         cplargs = {
-            'flux' : self.ele0.inviscid_flux_container(),
+            'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
-            'nvars' : nvars,
+            'nfvars' : nfvars,
             **self._const
         }
 
@@ -107,9 +107,9 @@ class EulerBCInters(BaseAdvecBCInters):
         nf, sf = self._vec_snorm, self._mag_snorm,
 
         def bc_flux(i_begin, i_end, *uf):
-            ur = np.empty(nvars)
+            ur = np.empty(nfvars)
             ftmp = pre()
-            fn = np.empty(nvars)
+            fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
                 nfi = nf[:, idx]
@@ -121,7 +121,7 @@ class EulerBCInters(BaseAdvecBCInters):
 
                 flux(ul, ur, nfi, fn, *ftmp)
 
-                for jdx in range(nvars):
+                for jdx in range(nfvars):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, bc_flux)

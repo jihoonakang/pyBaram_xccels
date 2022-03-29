@@ -9,29 +9,29 @@ import numpy as np
 
 class NavierStokesIntInters(BaseAdvecDiffIntInters):
     def _make_flux(self):
-        ndims, nvars = self.ndims, self.nvars
+        ndims, nfvars = self.ndims, self.nfvars
         lt, le, lf = self._lidx
         rt, re, rf = self._ridx
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compile Arguments
         cplargs = {
-            'flux' : self.ele0.inviscid_flux_container(),
+            'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
-            'compute_mu' : self.ele0.mu_container(),
             'ndims' : ndims,
-            'nvars' : nvars,
+            'nfvars' : nfvars,
             **self._const
         }
 
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+        compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
 
         def comm_flux(i_begin, i_end, gradf, *uf):
-            um = np.empty(nvars)
+            um = np.empty(nfvars)
             ftmp = pre()
-            fn = np.empty(nvars)
+            fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
                 nfi = nf[:, idx]
@@ -42,13 +42,15 @@ class NavierStokesIntInters(BaseAdvecDiffIntInters):
                 ur = uf[rti][rfi, :, rei]
                 gf = gradf[:, :, idx]
 
-                for jdx in range(nvars):
+                for jdx in range(nfvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
                 flux(ul, ur, nfi, fn, *ftmp)
-                visflux(um, gf, nfi, fn)
 
-                for jdx in range(nvars):
+                mu = compute_mu(um)
+                visflux(um, gf, nfi, mu, fn)
+
+                for jdx in range(nfvars):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
                     uf[rti][rfi, jdx, rei] = -fn[jdx]*sf[idx]
 
@@ -57,28 +59,28 @@ class NavierStokesIntInters(BaseAdvecDiffIntInters):
 
 class NavierStokesMPIInters(BaseAdvecDiffMPIInters):
     def _make_flux(self):
-        ndims, nvars = self.ndims, self.nvars
+        ndims, nfvars = self.ndims, self.nfvars
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compile Arguments
         cplargs = {
-            'flux' : self.ele0.inviscid_flux_container(),
+            'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
-            'compute_mu' : self.ele0.mu_container(),
             'ndims' : ndims,
-            'nvars' : nvars,
+            'nfvars' : nfvars,
             **self._const
         }
 
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+        compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
 
         def comm_flux(i_begin, i_end, gradf, rhs, *uf):
-            um = np.empty(nvars)
+            um = np.empty(nfvars)
             ftmp = pre()
-            fn = np.empty(nvars)
+            fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
                 nfi = nf[:, idx]
@@ -88,13 +90,15 @@ class NavierStokesMPIInters(BaseAdvecDiffMPIInters):
                 ur = rhs[:, idx]
                 gf = gradf[:, :, idx]
 
-                for jdx in range(nvars):
+                for jdx in range(nfvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
                 flux(ul, ur, nfi, fn, *ftmp)
-                visflux(um, gf, nfi, fn)
+                
+                mu = compute_mu(um)
+                visflux(um, gf, nfi, mu, fn)
 
-                for jdx in range(nvars):
+                for jdx in range(nfvars):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)
@@ -104,30 +108,30 @@ class NavierStokesBCInters(BaseAdvecDiffBCInters):
     _get_bc = get_bc
 
     def _make_flux(self):
-        ndims, nvars = self.ndims, self.nvars
+        ndims, nfvars = self.ndims, self.nfvars
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compile Arguments
         cplargs = {
-            'flux' : self.ele0.inviscid_flux_container(),
+            'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
-            'compute_mu' : self.ele0.mu_container(),
             'ndims' : ndims,
-            'nvars' : nvars,
+            'nfvars' : nfvars,
             **self._const
         }
 
         scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+        compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
 
         bc = self.bc
 
         def comm_flux(i_begin, i_end, gradf, *uf):
-            ur, um = np.empty(nvars), np.empty(nvars)
+            ur, um = np.empty(nfvars), np.empty(nfvars)
             ftmp = pre()
-            fn = np.empty(nvars)
+            fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
                 nfi = nf[:, idx]
@@ -137,13 +141,15 @@ class NavierStokesBCInters(BaseAdvecDiffBCInters):
                 gf = gradf[:, :, idx]
 
                 bc(ul, ur, nfi)
-                for jdx in range(nvars):
+                for jdx in range(nfvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
                 flux(ul, ur, nfi, fn, *ftmp)
-                visflux(um, gf, nfi, fn)
+                
+                mu = compute_mu(um)
+                visflux(um, gf, nfi, mu, fn)
 
-                for jdx in range(nvars):
+                for jdx in range(nfvars):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)

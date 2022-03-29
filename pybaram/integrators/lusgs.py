@@ -26,7 +26,7 @@ def make_lusgs_common(ele, _lambdaf, factor=1.0):
     # index
     nei_ele = ele.nei_ele
 
-    def _pre_lusgs(i_begin, i_end, uptsb, dt, diag, lambdaf):
+    def _pre_lusgs(i_begin, i_end, uptsb, dt, diag, lambdaf, mu=None):
         # Construct Matrix
         for idx in range(i_begin, i_end):
             diag[idx] = 1 / (dt[idx]*factor)
@@ -38,14 +38,14 @@ def make_lusgs_common(ele, _lambdaf, factor=1.0):
                 # Wave speed at face
                 u = uptsb[:, idx]
 
-                lamf = _lambdaf(u, nf, dx)
+                lamf = _lambdaf(u, nf, dx, idx, mu)
 
                 neib = nei_ele[jdx, idx]
                 if neib > 0:
                     u = uptsb[:, neib]
 
                     # Find maximum wave speed at face
-                    lamf = max(_lambdaf(u, nf, dx), lamf)
+                    lamf = max(_lambdaf(u, nf, dx, neib, mu), lamf)
 
                 # Diffusive margin of wave speed at face
                 lamf *= 1.01
@@ -75,7 +75,7 @@ def make_serial_lusgs(be, ele, mapping, unmapping, _flux):
     # Pre-compile functions
     _diff_flux = be.compile(make_diff_flux(nvars, _flux))
 
-    def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
+    def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
         du = np.zeros(nvars)
         f = np.zeros(nvars)
         dfj = np.zeros(nvars)
@@ -104,9 +104,9 @@ def make_serial_lusgs(be, ele, mapping, unmapping, _flux):
 
             for kdx in range(0, nvars):
                 dub[kdx, idx] = (rhsb[kdx, idx] -
-                                       0.5*df[kdx])/diag[idx]
+                                       0.5*df[kdx])/(diag[idx] + dsrc[kdx, idx])
 
-    def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
+    def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
         du = np.zeros(nvars)
         f = np.zeros(nvars)
         dfj = np.zeros(nvars)
@@ -136,7 +136,7 @@ def make_serial_lusgs(be, ele, mapping, unmapping, _flux):
 
             for kdx in range(0, nvars):
                 rhsb[kdx, idx] = dub[kdx, idx] - \
-                    0.5*df[kdx]/diag[idx]
+                    0.5*df[kdx]/(diag[idx] + dsrc[kdx, idx])
 
     return _lower_sweep, _upper_sweep
 
@@ -154,7 +154,7 @@ def make_colored_lusgs(be, ele, icolor, lcolor, _flux):
     # index
     nei_ele = ele.nei_ele
 
-    def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
+    def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
         du = np.zeros(nvars)
         f = np.zeros(nvars)
         dfj = np.zeros(nvars)
@@ -187,9 +187,9 @@ def make_colored_lusgs(be, ele, icolor, lcolor, _flux):
 
             for kdx in range(0, nvars):
                 dub[kdx, idx] = (rhsb[kdx, idx] -
-                                       0.5*df[kdx])/diag[idx]
+                                       0.5*df[kdx])/(diag[idx] + dsrc[kdx, idx])
 
-    def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, lambdaf):
+    def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
         du = np.zeros(nvars)
         f = np.zeros(nvars)
         dfj = np.zeros(nvars)
@@ -222,6 +222,6 @@ def make_colored_lusgs(be, ele, icolor, lcolor, _flux):
 
             for kdx in range(0, nvars):
                 rhsb[kdx, idx] = dub[kdx, idx] - \
-                    0.5*df[kdx]/diag[idx]
+                    0.5*df[kdx]/(diag[idx] + dsrc[kdx, idx])
 
     return _lower_sweep, _upper_sweep

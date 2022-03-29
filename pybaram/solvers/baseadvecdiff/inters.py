@@ -147,24 +147,6 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
 
 
 class BaseAdvecDiffBCInters(BaseAdvecBCInters):
-    def construct_bc(self):
-        # BC 함수
-        bcf = re.sub('-', '_', self.name)
-
-        # BC constant
-        if self._reqs:
-            bcsect = 'soln-bcs-{}'.format(self.bctype)
-            bcc = {k: npeval(self.cfg.getexpr(bcsect, k, self._const))
-                   for k in self._reqs}
-        else:
-            bcc = {}
-
-        bcc['ndims'], bcc['nvars'] = self.ndims, self.nvars            
-
-        bcc.update(self._const)
-
-        self.bc = self.be.compile(self._get_bc(bcf, bcc))
-
     def construct_kernels(self, elemap):
         self.construct_bc()
 

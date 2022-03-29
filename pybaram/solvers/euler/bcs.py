@@ -10,7 +10,7 @@ def get_bc(self, name, bcargs):
 
 
 def make_bc_sup_out(bcargs):
-    nvars = bcargs['nvars']
+    nvars = bcargs['nfvars']
 
     def bc(ul, ur, nf):
         for idx in range(nvars):
@@ -20,7 +20,7 @@ def make_bc_sup_out(bcargs):
 
 
 def make_bc_sup_in(bcargs):
-    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
     gamma = bcargs['gamma']
     rho, p = bcargs['rho'], bcargs['p']
 
@@ -40,7 +40,7 @@ def make_bc_sup_in(bcargs):
 
 
 def make_bc_sub_inv(bcargs):
-    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
     gamma = bcargs['gamma']
     rho, pmin = bcargs['rho'], bcargs['pmin']
 
@@ -64,7 +64,7 @@ def make_bc_sub_inv(bcargs):
 
 
 def make_bc_sub_outp(bcargs):
-    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
     gamma, p = bcargs['gamma'], bcargs['p']
 
     def bc(ul, ur, nf):
@@ -77,7 +77,7 @@ def make_bc_sub_outp(bcargs):
 
 
 def make_bc_slip_wall(bcargs):
-    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
 
     def bc(ul, ur, nf):
         vn = dot(ul, nf, ndims, 1)
@@ -92,7 +92,7 @@ def make_bc_slip_wall(bcargs):
 
 
 def make_bc_far(bcargs):
-    nvars, ndims = bcargs['nvars'], bcargs['ndims']
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
     gamma, pmin = bcargs['gamma'], bcargs['pmin']
     rho, p = bcargs['rho'], bcargs['p']
 
