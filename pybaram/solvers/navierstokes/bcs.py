@@ -4,15 +4,15 @@ from pybaram.solvers.euler.bcs import (make_bc_far, make_bc_sup_out, make_bc_sup
                                        make_bc_sub_inv, make_bc_sub_outp, make_bc_slip_wall)
 
 
-def get_bc(self, name, bcargs):
+def get_bc(self, be, name, bcargs):
     bc = eval('make_bc_'+name)
-    return bc(bcargs)
+    return be.compile(bc(bcargs))
 
 
 def make_bc_adia_wall(bcargs):
     nvars, ndims = bcargs['nfvars'], bcargs['ndims']
 
-    def bc(ul, ur, nf):
+    def bc(ul, ur, *args):
         ur[0] = ul[0]
 
         for idx in range(ndims):
@@ -30,7 +30,7 @@ def make_bc_isotherm_wall(bcargs):
 
     e = bcargs['cptw'] / gamma
 
-    def bc(ul, ur, nf):
+    def bc(ul, ur, *args):
         p = max((gamma - 1)*(ul[nvars-1] - 0.5 *
                              dot(ul, ul, ndims, 1, 1)/ul[0]), pmin)
         ur[0] = p/e/(gamma-1)

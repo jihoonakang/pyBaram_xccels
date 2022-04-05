@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from mpi4py import MPI
+from sympy import E
 from pybaram.backends.types import Kernel, MetaKernel
 from pybaram.inifile import INIFile
 from pybaram.integrators.base import BaseIntegrator
@@ -222,7 +223,7 @@ class LUSGS(BaseSteadyIntegrator):
     nreg = 3
 
     def construct_stages(self):
-        from pybaram.integrators.lusgs import make_lusgs_common, make_serial_lusgs
+        from pybaram.integrators.lusgs import make_lusgs_common, make_lusgs_update, make_serial_lusgs
 
         be = self.be
 
@@ -237,25 +238,54 @@ class LUSGS(BaseSteadyIntegrator):
 
             _flux = ele.flux_container()
             _lambdaf = ele.make_wave_speed()
+            nv = (0, ele.nfvars)
+
+            mu = ele.mu if hasattr(ele, 'mu') else None
+            mut = ele.mu if hasattr(ele, 'mut') else None
 
             # Make LU-SGS
-            _pre_lusgs, _update = make_lusgs_common(ele, _lambdaf, factor=1.0)
+            _update = make_lusgs_update(ele)
+            _pre_lusgs = make_lusgs_common(ele, _lambdaf, factor=1.0)
             _lsweep, _usweep = make_serial_lusgs(
-                be, ele, mapping, unmapping, _flux
+                be, ele, nv, mapping, unmapping, _flux
             )
 
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 
-                ele.upts[0], ele.dt, diag, lambdaf
-            )
-            
+                ele.upts[0], ele.dt, diag, lambdaf, mu, mut
+            )            
             lsweeps = Kernel(be.make_loop(ele.neles, func=_lsweep),
                 ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf) 
 
             usweeps = Kernel(be.make_loop(ele.neles, func=_usweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf) 
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf)
 
-            ele.lusgs = MetaKernel((pre_lusgs, lsweeps, usweeps))
+            kernels = [pre_lusgs, lsweeps, usweeps]
+
+            # Make Turbulent LU-SGS
+            if hasattr(ele, 'mut'):
+                _tflux = ele.tflux_container()
+                _tlambdaf = ele.make_turb_wave_speed()
+                tnv = (ele.nfvars, ele.nvars)
+
+                _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=1.0)
+                _tlsweep, _tusweep = make_serial_lusgs(
+                    be, ele, tnv, mapping, unmapping, _tflux
+                )
+
+                pre_tlusgs = Kernel(
+                    be.make_loop(ele.neles, _pre_tlusgs), 
+                    ele.upts[0], ele.dt, diag, lambdaf, mu, mut
+                )                
+                tlsweeps = Kernel(be.make_loop(ele.neles, func=_tlsweep),
+                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf) 
+
+                tusweeps = Kernel(be.make_loop(ele.neles, func=_tusweep),
+                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf)    
+
+                kernels += [pre_tlusgs, tlsweeps, tusweeps]             
+
+            ele.lusgs = MetaKernel(kernels)
             ele.update = Kernel(be.make_loop(ele.neles, _update),
                 ele.upts[0], ele.upts[1]
             )
@@ -275,7 +305,7 @@ class ColoredLUSGS(BaseSteadyIntegrator):
     nreg = 3
 
     def construct_stages(self):
-        from pybaram.integrators.lusgs import make_lusgs_common, make_colored_lusgs
+        from pybaram.integrators.lusgs import  make_lusgs_common, make_lusgs_update, make_colored_lusgs
 
         be = self.be
 
@@ -291,15 +321,21 @@ class ColoredLUSGS(BaseSteadyIntegrator):
             _flux = ele.flux_container()
             _lambdaf = ele.make_wave_speed()
 
+            if hasattr(ele, 'mu'):
+                mu = ele.mu
+            else:
+                mu = None
+
             # Make LU-SGS
-            _pre_lusgs, _update = make_lusgs_common(ele, _lambdaf, factor=1.0)
+            _update = make_lusgs_update(ele)
+            _pre_lusgs = make_lusgs_common(ele, _lambdaf, factor=1.0)
             _lsweep, _usweep = make_colored_lusgs(
                 be, ele, icolor, lev_color, _flux
             )
 
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 
-                ele.upts[0], ele.dt, diag, lambdaf, ele.mu
+                ele.upts[0], ele.dt, diag, lambdaf, mu
             )
             
             lsweeps = [

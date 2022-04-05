@@ -37,19 +37,23 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
     def construct_kernels(self, vertex, xw, nreg):
         super().construct_kernels(vertex, xw, nreg)
 
+        # Aux array
+        nauxvars = len(self.auxvars)
+        self.aux = aux = np.empty((nauxvars, self.neles))
+
         # Viscosity
-        self.aux = aux = np.empty((1, self.neles))
         self.mu = aux[0]
 
+        # Kernel argument 조절 및 Aux variable 초기화
         self.post.update_args(self.upts_in, self.mu)
         self.post()
 
-        # Timestep
+        # Timestep Kernel argument 조절
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.mu, self.dt)
 
     def _make_timestep(self):
-        ndims, nface = self.ndims, self.nface
+        ndims, nface, nfvars = self.ndims, self.nface, self.nfvars
         vol = self._vol
         smag, svec = self._gen_snorm_fpts()
         gamma, pmin = self._const['gamma'], self._const['pmin']
@@ -58,7 +62,7 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         def timestep(i_begin, i_end, u, mu, dt, cfl):
             for idx in range(i_begin, i_end):
                 rho = u[0, idx]
-                et = u[-1, idx]
+                et = u[nfvars-1, idx]
                 rv2 = dot(u[:, idx], u[:, idx], ndims, 1, 1)/rho
 
                 p = max((gamma - 1)*(et - 0.5*rv2), pmin)
@@ -80,7 +84,7 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         gamma, pmin = self._const['gamma'], self._const['pmin']
         pr = self._const['pr']
 
-        def _lambdaf(u, nf, dx, idx, mu):
+        def _lambdaf(u, nf, dx, idx, mu, *args):
             rho, et = u[0], u[nfvars-1]
 
             contra = dot(u, nf, ndims, 1)/rho

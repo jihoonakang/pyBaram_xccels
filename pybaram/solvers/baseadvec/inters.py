@@ -132,7 +132,7 @@ class BaseAdvecBCInters(BaseBCInters):
 
         bcc.update(self._const)
 
-        self.bc = self.be.compile(self._get_bc(bcf, bcc))
+        self.bc = self._get_bc(self.be, bcf, bcc)
 
     def construct_kernels(self, elemap):
         self.construct_bc()

@@ -4,9 +4,9 @@ from pybaram.utils.nb import dot
 import numpy as np
 
 
-def get_bc(self, name, bcargs):
+def get_bc(self, be, name, bcargs):
     bc = eval('make_bc_'+name)
-    return bc(bcargs)
+    return be.compile(bc(bcargs))
 
 
 def make_bc_sup_out(bcargs):
@@ -32,7 +32,7 @@ def make_bc_sup_in(bcargs):
 
     ub[nvars-1] = p/(gamma-1) + 0.5*sum(ub[1:-1]**2)/rho
 
-    def bc(ul, ur, nf):
+    def bc(ul, ur, *args):
         for idx in range(nvars):
             ur[idx] = ub[idx]
 
@@ -52,7 +52,7 @@ def make_bc_sub_inv(bcargs):
 
     qb = 0.5*dot(ub, ub, ndims, 1, 1) / ub[0]
 
-    def bc(ul, ur, nf):
+    def bc(ul, ur, *args):
         for idx in range(nvars-1):
             ur[idx] = ub[idx]
 
@@ -67,7 +67,7 @@ def make_bc_sub_outp(bcargs):
     nvars, ndims = bcargs['nfvars'], bcargs['ndims']
     gamma, p = bcargs['gamma'], bcargs['p']
 
-    def bc(ul, ur, nf):
+    def bc(ul, ur, *args):
         for idx in range(nvars-1):
             ur[idx] = ul[idx]
 
