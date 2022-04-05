@@ -320,22 +320,21 @@ class ColoredLUSGS(BaseSteadyIntegrator):
 
             _flux = ele.flux_container()
             _lambdaf = ele.make_wave_speed()
+            nv = (0, ele.nfvars)
 
-            if hasattr(ele, 'mu'):
-                mu = ele.mu
-            else:
-                mu = None
+            mu = ele.mu if hasattr(ele, 'mu') else None
+            mut = ele.mut if hasattr(ele, 'mut') else None
 
             # Make LU-SGS
             _update = make_lusgs_update(ele)
             _pre_lusgs = make_lusgs_common(ele, _lambdaf, factor=1.0)
             _lsweep, _usweep = make_colored_lusgs(
-                be, ele, icolor, lev_color, _flux
+                be, ele, nv, icolor, lev_color, _flux
             )
 
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 
-                ele.upts[0], ele.dt, diag, lambdaf, mu
+                ele.upts[0], ele.dt, diag, lambdaf, mu, mut
             )
             
             lsweeps = [
@@ -352,7 +351,41 @@ class ColoredLUSGS(BaseSteadyIntegrator):
                 for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
             ]
 
-            ele.lusgs = MetaKernel((pre_lusgs, *lsweeps, *usweeps))
+            kernels = [pre_lusgs, *lsweeps, *usweeps]
+
+            # Make Turbulent LU-SGS
+            if hasattr(ele, 'mut'):
+                _tflux = ele.tflux_container()
+                _tlambdaf = ele.make_turb_wave_speed()
+                tnv = (ele.nfvars, ele.nvars)
+
+                _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=1.0)
+                _tlsweep, _tusweep = make_colored_lusgs(
+                    be, ele, tnv, icolor, lev_color, _tflux
+                )
+
+                pre_tlusgs = Kernel(
+                    be.make_loop(ele.neles, _pre_tlusgs), 
+                    ele.upts[0], ele.dt, diag, lambdaf, mu, mut
+                )                
+
+                tlsweeps = [
+                    Kernel(be.make_loop(n0=n0, ne=ne, func=_tlsweep),
+                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf
+                    ) 
+                    for n0, ne in zip(ncolor[:-1], ncolor[1:])
+                ]
+
+                tusweeps = [
+                    Kernel(be.make_loop(n0=n0, ne=ne, func=_tusweep),
+                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf
+                    ) 
+                    for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
+                ] 
+
+                kernels += [pre_tlusgs, *tlsweeps, *tusweeps]  
+
+            ele.lusgs = MetaKernel(kernels)
             ele.update = Kernel(be.make_loop(ele.neles, _update),
                 ele.upts[0], ele.upts[1]
             )
