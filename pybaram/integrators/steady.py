@@ -241,7 +241,7 @@ class LUSGS(BaseSteadyIntegrator):
             nv = (0, ele.nfvars)
 
             mu = ele.mu if hasattr(ele, 'mu') else None
-            mut = ele.mu if hasattr(ele, 'mut') else None
+            mut = ele.mut if hasattr(ele, 'mut') else None
 
             # Make LU-SGS
             _update = make_lusgs_update(ele)
