@@ -151,8 +151,8 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
         self.aux = aux = np.empty((nauxvars, self.neles))
 
         # 벽면까지 길이 계산
-        self.ydns = aux[0]
-        self.ydns[:] = self._wall_distance(xw)
+        self.ydist = aux[0]
+        self.ydist[:] = self._wall_distance(xw)
 
         # Viscosity
         self.mu, self.mut = aux[1], aux[2]
@@ -182,7 +182,7 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
         ndims, nvars, nface = self.ndims, self.nvars, self.nface
 
         rcp_vol = self.rcp_vol
-        ydns = self.ydns
+        ydist = self.ydist
 
         turb_src = self.turb_src_container()
 
@@ -198,7 +198,7 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
 
                 # Turbulence source term
                 turb_src(upts[:, idx], grad[:, :, idx], mu[idx],
-                         ydns[idx], rhs[:, idx], dsrc[:, idx])
+                         ydist[idx], rhs[:, idx], dsrc[:, idx])
 
         return self.be.make_loop(self.neles, _div_upts)
 
