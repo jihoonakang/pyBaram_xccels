@@ -23,12 +23,14 @@ def make_parallel_loop1d(ne, func, n0=0):
     return loop
             
             
-def make_serial_loop1d(ne, func, n0=0):
+def make_serial_loop1d(ne, func, n0=0, debug=False):
     # Compile func
     _func = nb.jit(nopython=True, fastmath=True)(func)
 
-    @nb.jit(nopython=True, fastmath=True)
     def loop(*args):
         _func(n0, ne, *args)
             
-    return loop
+    if debug:
+        return loop
+    else:
+        return nb.jit(nopython=True, fastmath=True)(loop)

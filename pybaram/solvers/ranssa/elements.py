@@ -165,7 +165,7 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
 
         self.div_upts.update_args(
             self.upts_out, self.fpts, self.upts_in, self.grad,
-            self.mu, self.dsrc
+            self.dsrc, self.mu
         )
 
         # Timestep Kernel argument 조절
@@ -186,7 +186,7 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
 
         turb_src = self.turb_src_container()
 
-        def _div_upts(i_begin, i_end, rhs, fpts, upts, grad, mu, dsrc, t=0):
+        def _div_upts(i_begin, i_end, rhs, fpts, upts, grad, dsrc, mu, t=0):
             for idx in range(i_begin, i_end):
                 rcp_voli = rcp_vol[idx]
                 for jdx in range(nvars):
