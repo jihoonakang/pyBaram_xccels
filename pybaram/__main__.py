@@ -12,11 +12,14 @@ from pybaram.readers.native import NativeReader
 from pybaram.writers import get_writer
 
 import h5py
+import os
 
 
 def process_import(args):
+    extn = os.path.splitext(args.inmesh.name)[1]
+
     # Get reader
-    reader = get_reader(args.inmesh, args.scale)
+    reader = get_reader(extn, args.inmesh, args.scale)
 
     # Get mesh in the pbm format
     mesh = reader.to_pbm()
