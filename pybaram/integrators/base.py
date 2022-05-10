@@ -42,3 +42,12 @@ class BaseIntegrator:
     @property
     def curr_aux(self):
         return self.sys.eles.aux
+
+    @property
+    def curr_mu(self):
+        mu = self.sys.eles.mu
+
+        if hasattr(self.sys.eles, 'mut'):
+            mu = ProxyList([m1 + m2 for m1, m2 in zip(mu, self.sys.eles.mut)])
+        
+        return mu

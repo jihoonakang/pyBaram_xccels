@@ -32,31 +32,35 @@ class ForcePlugin(BasePlugin):
         self.dvec = np.array([npeval(cfg.get(sect, 'dir-{}'.format(d), dvec[i]), const)
                               for i, d in enumerate(dname)])
 
+        # RANS / Laminar / 비점성 구분 
+        if intg.sys.name in ['navier-stokes']:
+            self.viscous = 'laminar'
+        elif intg.sys.name.startswith('rans'):
+            self.viscous = 'rans'
+        else:
+            self.viscous = False
+
         # bcmap
         bcmap = {bc.bctype: bc for bc in intg.sys.bint}
 
         # Get idx, norm
         self._bcinfo = bcinfo = {}
 
-        try:
-            bc = bcmap[suffix]
-            t, e, _ = bc._lidx
-            mag, vec = bc._mag_snorm, bc._vec_snorm
+        bc = bcmap[suffix]
+        t, e, _ = bc._lidx
+        mag, vec = bc._mag_snorm, bc._vec_snorm
 
-            for i in np.unique(t):
-                mask = (t == i)
-                eidx = e[mask]
-                norm = vec[:, mask]*mag[mask]
+        for i in np.unique(t):
+            mask = (t == i)
+            eidx = e[mask]
+            nvec, nmag = vec[:, mask], mag[mask]
 
-                if intg.sys.name in ['euler']:
-                    bcinfo[i] = (eidx, norm)
-                    self.viscous = False
-                else:
-                    dxn = np.linalg.norm(bc._dx_adj[:, mask], axis=0)/2
-                    bcinfo[i] = (eidx, norm, dxn)
-                    self.viscous = True
-        except:
-            self.viscous = False
+            if not self.viscous:
+                bcinfo[i] = (eidx, nvec*nmag)
+            else:
+                # Get first height length
+                dxn = np.linalg.norm(bc._dx_adj[:, mask], axis=0)/2
+                bcinfo[i] = (eidx, nvec, nmag, dxn)
 
         # Get integration mode
         self.mode = intg.mode
@@ -72,7 +76,10 @@ class ForcePlugin(BasePlugin):
         # Out file name and header
         if rank == 0:
             fname = "force_{}.csv".format(suffix)
-            header = lead + ['c{}'.format(x) for x in dname]
+            header = lead + ['c{}_p'.format(x) for x in dname]
+
+            if self.viscous:
+                header += ['c{}_v'.format(x) for x in dname]
             self.outf = csv_write(fname, header)
 
     def __call__(self, intg):
@@ -89,25 +96,40 @@ class ForcePlugin(BasePlugin):
         # eles, solns를 list로 변환
         eles = list(intg.sys.eles)
         solns = list(intg.curr_soln)
+        mus = list(intg.curr_mu)
 
         # Force 계산
-        force = []
+        pforce = []
         if not self.viscous:
             for i, (eidx, norm) in self._bcinfo.items():
                 soln = solns[i]
                 p = eles[i].conv_to_prim(soln[:, eidx], self.cfg)[1]
-                force.append(np.sum(p*norm, axis=1))
+                pforce.append(np.sum(p*norm, axis=1))
         else:
-            for i, (eidx, norm, dxn) in self._bcinfo.items():
+            vforce = []
+            for i, (eidx, nvec, nmag, dxn) in self._bcinfo.items():
                 soln = solns[i]
-                p = eles[i].conv_to_prim(soln[:, eidx], self.cfg)[1]
-                force.append(np.sum(p*norm, axis=1))
+                prime = eles[i].conv_to_prim(soln[:, eidx], self.cfg)
+                p, uvw = prime[1], np.array(prime[2:2+intg.sys.ndims])
+                mu = mus[i][eidx]
+
+                # Tangential velocity
+                vt = uvw - np.einsum('ij,ij->j', nvec, uvw)*nvec
+                tau = mu*vt/dxn
+                pforce.append(np.sum(p*nvec*nmag, axis=1))
+                vforce.append(np.sum(tau*nmag, axis=1))
 
         # 계수 계산
-        if force:
-            cf = np.dot(self.dvec, np.sum(force, axis=0))*self._rcp_dynp
+        if pforce:
+            cf = np.dot(self.dvec, np.sum(pforce, axis=0))*self._rcp_dynp
+            if self.viscous:
+                cfv = np.dot(self.dvec, np.sum(vforce, axis=0))*self._rcp_dynp
+                cf = np.hstack([cf, cfv])
         else:
-            cf = np.zeros(len(self.dname))
+            if self.viscous:
+                cf = np.zeros(len(self.dname)*2)
+            else:
+                cf = np.zeros(len(self.dname))
 
         if self._rank != 0:
             self._comm.Reduce(cf, None, op=MPI.SUM, root=0)
