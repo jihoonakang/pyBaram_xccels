@@ -96,7 +96,6 @@ class ForcePlugin(BasePlugin):
         # eles, solns를 list로 변환
         eles = list(intg.sys.eles)
         solns = list(intg.curr_soln)
-        mus = list(intg.curr_mu)
 
         # Force 계산
         pforce = []
@@ -106,6 +105,9 @@ class ForcePlugin(BasePlugin):
                 p = eles[i].conv_to_prim(soln[:, eidx], self.cfg)[1]
                 pforce.append(np.sum(p*norm, axis=1))
         else:
+            # Get viscosity
+            mus = list(intg.curr_mu)
+            
             vforce = []
             for i, (eidx, nvec, nmag, dxn) in self._bcinfo.items():
                 soln = solns[i]

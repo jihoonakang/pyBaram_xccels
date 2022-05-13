@@ -1,0 +1,120 @@
+# -*- coding: utf-8 -*-
+from mpi4py import MPI
+
+
+import numpy as np
+
+from pybaram.plugins.base import BasePlugin, csv_write
+from pybaram.utils.np import npeval
+
+
+class SurfIntPlugin(BasePlugin):
+    name = 'surface'
+
+    def __init__(self, intg, cfg, suffix):
+        self.cfg = cfg
+        sect = 'soln-plugin-{}-{}'.format(self.name, suffix)
+
+        #  MPI
+        self._comm = comm = MPI.COMM_WORLD
+        self._rank = rank = comm.rank
+
+        # Get constants and expression
+        self._const = cfg.items('constants')
+        items = [e.strip() for e in cfg.get(sect, 'items', 'area').split(',')]
+        self._exprs = [cfg.get(sect, item, 1) for item in items]
+
+        # Parse normal vector name
+        self.ndims = ndims = intg.sys.ndims
+        self._nvec = ['n{}'.format(e) for e in 'xyz'[:ndims]]
+
+        # bcmap
+        bcmap = {bc.bctype: bc for bc in intg.sys.bint}
+
+        # Get idx, norm
+        self._bcinfo = bcinfo = {}
+
+        bc = bcmap[suffix]
+        t, e, _ = bc._lidx
+        mag, vec = bc._mag_snorm, bc._vec_snorm
+
+        area = 0
+        for i in np.unique(t):
+            mask = (t == i)
+            eidx = e[mask]
+            nvec, nmag = vec[:, mask], mag[mask]
+            bcinfo[i] = (eidx, nvec, nmag)
+            area += np.sum(nmag)
+
+        # Compute surface area
+        area = np.array(area)
+        if self._rank != 0:
+            self._comm.Reduce(area, None, op=MPI.SUM, root=0)
+        else:
+            self._comm.Reduce(MPI.IN_PLACE, area, op=MPI.SUM, root=0)
+        
+        self._area = area
+
+        # Get integration mode
+        self.mode = intg.mode
+        if self.mode == 'steady':
+            self.itout = cfg.getint(sect, 'iter-out', 100)
+            lead = ['iter']
+        else:
+            self.dtout = cfg.getfloat(sect, 'dt-out')
+            self.tout_next = intg.tcurr
+            intg.add_tlist(self.dtout)
+            lead = ['t']
+
+        # Out file name and header
+        if rank == 0:
+            header = lead + ['sum_{}'.format(e) for e in items] + ['avg_{}'.format(e) for e in items]
+            fname = "surface_{}.csv".format(suffix)
+            self.outf = csv_write(fname, header)
+
+    def __call__(self, intg):
+        if self.mode == 'steady':
+            if not intg.isconv and intg.iter % self.itout:
+                return
+            txt = [intg.iter]
+
+        else:
+            if abs(intg.tcurr - self.tout_next) > 1e-6:
+                return
+            txt = [intg.tcurr]
+
+        # eles, solns를 list로 변환
+        eles = list(intg.sys.eles)
+        solns = list(intg.curr_soln)
+
+        dist = []
+        for i, (eidx, nvec, nmag) in self._bcinfo.items():
+            # Convert Primevars
+            soln = solns[i]
+            pn = eles[i].primevars
+            pv = eles[i].conv_to_prim(soln[:, eidx], self.cfg)
+
+            # Conpute expr
+            subs = {n : v for n,v in zip(pn, pv)}
+            subs.update({n : v for n, v in zip(self._nvec, nvec)})
+            subs.update(self._const)
+            var_at = np.array([npeval(expr, subs) for expr in self._exprs])
+            dist.append(var_at*nmag)
+        
+        if len(var_at.shape) > 1:
+            integ_var = np.sum(np.hstack(dist), axis=1)
+        else:
+            integ_var = np.array([np.sum(dist)])
+
+        if self._rank != 0:
+            self._comm.Reduce(integ_var, None, op=MPI.SUM, root=0)
+        else:
+            self._comm.Reduce(MPI.IN_PLACE, integ_var, op=MPI.SUM, root=0)
+
+        if self._rank == 0:
+            # Write
+            row = txt + integ_var.tolist() + (integ_var/self._area).tolist()
+            print(','.join(str(r) for r in row), file=self.outf)
+
+            # Flush to disk
+            self.outf.flush()
