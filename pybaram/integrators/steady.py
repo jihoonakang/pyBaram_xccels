@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from mpi4py import MPI
-from sympy import E
 from pybaram.backends.types import Kernel, MetaKernel
 from pybaram.inifile import INIFile
 from pybaram.integrators.base import BaseIntegrator
