@@ -221,27 +221,42 @@ class ConsAssembler(object):
 
 
 class NodesAssembler(object):
-    def __init__(self, nodepts, elenodes, felespent, etype_map, scale):
+    def __init__(self, nodepts, elenodes, felespent, bfacespents, etype_map, scale):
         self._nodepts, self._elenodes = nodepts, elenodes
-        self._felespent, self._etype_map = felespent, etype_map
+        self._bfacespents = {v: k for k, v in bfacespents.items()}
+        self._felespent = felespent
+        self._etype_map = etype_map
         self._scale = scale
 
     def _fluid_elm(self):
         elm = {}
+        bface = {}
         for (etype, pent), ele in self._elenodes.items():
-            if pent != self._felespent:
-                continue
-
             petype = self._etype_map[etype][0]
-            elm['elm_{}_p0'.format(petype)] = ele
 
-        return elm
+            if pent == self._felespent:
+                elm['elm_{}_p0'.format(petype)] = ele
+            else:
+                bname = self._bfacespents[pent]
+                bface['{}_{}'.format(bname, petype)] = ele
+
+        return elm, bface
 
     def get_nodes(self):
         key = np.array(list(self._nodepts.keys()), dtype='i4')
         vals = np.array(list(self._nodepts.values()))*self._scale
 
         ret = {'node_p0': vals, 'nmap_p0': key}
-        ret.update(self._fluid_elm())
+        elm, bface = self._fluid_elm()
+        ret.update(elm)
+        ret.update(self._extract_bnodes(bface))
 
         return ret
+
+    def _extract_bnodes(self, bface):
+        _etype_ndim = {'line' : 2,  'tri': 3, 'quad': 3}
+
+        return {'bface_'+ k : np.rollaxis(np.array(
+                [[self._nodepts[e] for e in l] for l in v]), 1
+                )[:,:,:_etype_ndim[k.split('_')[-1]]] 
+            for k, v in bface.items()}

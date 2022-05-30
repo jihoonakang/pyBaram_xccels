@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from argon2 import PasswordHasher
 from pybaram.solvers.base.inters import BaseInters
 from pybaram.solvers.baseadvecdiff import BaseAdvecDiffIntInters, BaseAdvecDiffBCInters, BaseAdvecDiffMPIInters
 from pybaram.solvers.ranssa.visflux import make_visflux
@@ -156,6 +157,7 @@ class RANSSAMPIInters(BaseAdvecDiffMPIInters, RANSSAInters):
 
 class RANSSABCInters(BaseAdvecDiffBCInters, RANSSAInters):
     _get_bc = get_bc
+    is_vis_wall = False
 
     def construct_bc(self):
         # BC 함수
@@ -240,11 +242,13 @@ class RANSSASlipWallBCInters(RANSSABCInters):
 
 class RANSSAAdiaWallBCInters(RANSSABCInters):
     name = 'adia-wall'
+    is_vis_wall = True
 
 
 class RANSSAIsothermWallBCInters(RANSSABCInters):
     name = 'isotherm-wall'
     _reqs = ['cptw']
+    is_vis_wall = True
 
 
 class RANSASSupInBCInters(RANSSABCInters):

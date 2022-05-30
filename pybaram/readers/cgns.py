@@ -154,7 +154,7 @@ class CGNSReader(BaseReader):
         maps = self._etype_map, self._petype_fnmap
         self._cons = ConsAssembler(elenodes, pents, maps, nodepts)
         self._nodes = NodesAssembler(
-            nodepts, elenodes, felespent, self._etype_map, scale)
+            nodepts, elenodes, felespent, bfacespents, self._etype_map, scale)
 
     def __del__(self):
         if hasattr(self, '_file'):
