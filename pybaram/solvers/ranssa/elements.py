@@ -175,7 +175,7 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
     def _wall_distance(self, xw):
         # 벽면에서 부터 길이 계산
         eles = self.eles.swapaxes(0, 1)[:,:,None]
-        xw = xw[None,:]
+        xw = xw
         return np.array([np.average(np.linalg.norm(xc - xw, axis=2).min(axis=1)) for xc in eles])
 
     def _make_div_upts(self):

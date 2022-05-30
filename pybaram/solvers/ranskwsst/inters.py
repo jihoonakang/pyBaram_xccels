@@ -191,6 +191,7 @@ class RANSKWSSTMPIInters(BaseAdvecDiffMPIInters, RANSKWSSTInters):
 
 class RANSKWSSTBCInters(BaseAdvecDiffBCInters, RANSKWSSTInters):
     _get_bc = get_bc
+    is_vis_wall = False
 
     def construct_bc(self):
         # BC 함수
@@ -313,10 +314,12 @@ class RANSKWSSTSlipWallBCInters(RANSKWSSTBCInters):
 
 class RANSKWSSTAdiaWallBCInters(RANSKWSSTBCInters):
     name = 'adia-wall'
+    is_vis_wall = True
 
 
 class RANSKWSSTIsothermWallBCInters(RANSKWSSTBCInters):
     name = 'isotherm-wall'
+    is_vis_wall = True
     _reqs = ['cptw']
 
 

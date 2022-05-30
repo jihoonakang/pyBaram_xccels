@@ -262,7 +262,8 @@ class GMSHReader(BaseReader):
         elenodes, nodepts = self._elenodes, self._nodepts
         self._cons = ConsAssembler(elenodes, pents, maps, nodepts)
         self._nodes = NodesAssembler(
-            nodepts, elenodes, self._felespent, self._etype_map, self._scale
+            nodepts, elenodes, self._felespent, self._bfacespents, 
+            self._etype_map, self._scale
         )
 
         rawm = {}
