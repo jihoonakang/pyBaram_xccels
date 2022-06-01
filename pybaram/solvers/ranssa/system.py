@@ -49,4 +49,4 @@ class RANSSASystem(BaseAdvecDiffSystem):
 
     def compute_bc_wall(self, bint):
         # 벽면 경계 조건 위치
-        return np.vstack([bc.xw for bc in bint if bc.is_vis_wall])[None,:]
+        return np.vstack([bc.xw for bc in bint if bc.is_vis_wall])

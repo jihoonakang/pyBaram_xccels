@@ -112,7 +112,7 @@ class RANSKWSSTFluidElements(ViscousFluidElements):
             ddestk = betast*w 
             destk = ddestk*rho*k
 
-            prodw = tgamma / nut * bigP
+            prodw = tgamma / nut * prodk
             crossw = 2*(1-f1)*rho*sigmaw2/w*kwcross 
             ddestw = 2*beta*w + max(crossw, 0)/(rho*w)
             destw = beta*rho*w**2 - crossw
@@ -189,7 +189,8 @@ class RANSKWSSTElements(BaseAdvecDiffElements, RANSKWSSTFluidElements):
 
         # 벽면까지 길이 계산
         self.ydist = aux[0]
-        self.ydist[:] = self._wall_distance(xw)
+        #self.ydist[:] = self._wall_distance(xw)
+        self._wall_distance(xw, self.ydist)
 
         super().construct_kernels(vertex, xw, nreg)
 
@@ -209,11 +210,14 @@ class RANSKWSSTElements(BaseAdvecDiffElements, RANSKWSSTFluidElements):
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.mu, self.mut, self.dt)
 
-    def _wall_distance(self, xw):
-        # 벽면에서 부터 길이 계산
+    def _wall_distance(self, xw, ydist):
+        import time
+        print('Wall distance started')
+        t0 = time.time()
         eles = self.eles.swapaxes(0, 1)[:,:,None]
-        xw = xw
-        return np.array([np.average(np.linalg.norm(xc - xw, axis=2).min(axis=1)) for xc in eles])
+        xw = xw[None, :]
+        ydist[:] = np.array([np.average(np.linalg.norm(xc - xw, axis=2).min(axis=1)) for xc in eles])
+        print('Completed Wall distance', time.time() - t0)
 
     def _make_timestep(self):
         ndims, nface = self.ndims, self.nface
@@ -323,6 +327,7 @@ class RANSKWSSTElements(BaseAdvecDiffElements, RANSKWSSTFluidElements):
         _compute_mut = self.mut_container()
 
         ydist = self.ydist
+        muf = self._const['mu']
 
         def post(i_begin, i_end, upts, grad, mu, mut):
             # Update
@@ -332,5 +337,6 @@ class RANSKWSSTElements(BaseAdvecDiffElements, RANSKWSSTFluidElements):
                 mut[idx] = _compute_mut(
                     upts[:, idx], grad[:,:,idx], mu[idx], ydist[idx]
                 )
+                mut[idx] = min(mut[idx], 100000*muf)
 
         return self.be.make_loop(self.neles, post)

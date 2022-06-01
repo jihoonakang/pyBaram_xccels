@@ -3,6 +3,7 @@ from pybaram.solvers.baseadvecdiff import BaseAdvecDiffElements
 from pybaram.solvers.navierstokes import ViscousFluidElements
 from pybaram.backends.types import Kernel
 from pybaram.utils.nb import dot
+from pybaram.utils.np import eps
 
 import numpy as np
 
@@ -119,6 +120,27 @@ class RANSSAFluidElements(ViscousFluidElements):
         
         return self.be.compile(src)
 
+    def fix_nonPys_container(self):
+        gamma, pmin = self._const['gamma'], self._const['pmin']
+        ndims, nfvars, nvars = self.ndims, self.nfvars, self.nvars
+
+        # Adhoc
+
+        def fix_nonPhy(u):
+            rho, et = u[0], u[nfvars-1]
+            if rho < 0:
+                u[0] = rho = eps
+
+            p = (gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho)
+
+            if p < pmin:
+                u[nfvars - 1] = pmin/(gamma-1) + 0.5*dot(u, u, ndims, 1, 1)/rho
+            
+            #u[nvars-1] = max(eps, u[nvars-1])
+            if u[nvars-1] < 10*eps:
+                u[nvars-1] = 10*eps
+
+        return self.be.compile(fix_nonPhy)
 
 class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
     def __init__(self, be, cfg, name, eles, vcon):
@@ -152,7 +174,8 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
 
         # 벽면까지 길이 계산
         self.ydist = aux[0]
-        self.ydist[:] = self._wall_distance(xw)
+        #self.ydist[:] = self._wall_distance(xw)
+        self._wall_distance(xw, self.ydist)
 
         # Viscosity
         self.mu, self.mut = aux[1], aux[2]
@@ -172,12 +195,15 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.mu, self.mut, self.dt)
 
-    def _wall_distance(self, xw):
-        # 벽면에서 부터 길이 계산
+    def _wall_distance(self, xw, ydist):
+        import time
+        print('Wall distance started')
+        t0 = time.time()
         eles = self.eles.swapaxes(0, 1)[:,:,None]
-        xw = xw
-        return np.array([np.average(np.linalg.norm(xc - xw, axis=2).min(axis=1)) for xc in eles])
-
+        xw = xw[None, :]
+        ydist[:] = np.array([np.average(np.linalg.norm(xc - xw, axis=2).min(axis=1)) for xc in eles])
+        print('Completed Wall distance', time.time() - t0)
+        
     def _make_div_upts(self):
         ndims, nvars, nface = self.ndims, self.nvars, self.nface
 

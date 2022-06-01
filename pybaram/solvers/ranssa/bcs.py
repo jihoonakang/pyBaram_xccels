@@ -27,7 +27,7 @@ def make_turb_bc_wall(bcargs):
     nvars = bcargs['nvars']
 
     def bc(ul, ur, nf):
-        ur[nvars-1] = -ul[-1]
+        ur[nvars-1] = -ul[nvars-1]
 
     return bc
 
@@ -36,7 +36,7 @@ def make_turb_bc_ext(bcargs):
     nvars = bcargs['nvars']
 
     def bc(ul, ur, nf):
-        ur[nvars-1] = ul[-1]
+        ur[nvars-1] = ul[nvars-1]
 
     return bc
 

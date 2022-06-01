@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from argon2 import PasswordHasher
 from pybaram.solvers.base.inters import BaseInters
 from pybaram.solvers.baseadvecdiff import BaseAdvecDiffIntInters, BaseAdvecDiffBCInters, BaseAdvecDiffMPIInters
 from pybaram.solvers.ranssa.visflux import make_visflux
@@ -36,7 +35,7 @@ class RANSSAInters(BaseInters):
             # Upwind
             fn[nvars-1] = contrap*ul[nvars-1] + contram*ur[nvars-1]
 
-            nu = mu / (ul[0] + ur[0])
+            nu = 2*mu / (ul[0] + ur[0])
             nut = 0.5*(ul[nvars-1] + ur[nvars-1])
 
             tau = dot(gf[:, nvars-1], nf, ndims)

@@ -33,7 +33,7 @@ def make_turb_bc_wall(bcargs):
 
         # w
         rwb = 60*mu/beta1/d1**2
-        ur[nvars-1] = rwb - ul[nvars-1]
+        ur[nvars-1] = 2*rwb - ul[nvars-1]
 
     return bc
 

@@ -188,7 +188,7 @@ class BaseElements:
         dxc = np.rollaxis(self.dxc, 2)
 
         # TODO:Inverse distance weight
-        w = 1.0 / np.linalg.norm(dxc, axis=0)
+        w =  1.0 #1.0 / np.linalg.norm(dxc, axis=0)
         dxc = dxc * w
 
         # Least square matrix [dx*dy] and its inverse
