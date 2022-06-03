@@ -230,7 +230,7 @@ class NodesAssembler(object):
 
     def _fluid_elm(self):
         elm = {}
-        bface = {}
+        bnode = defaultdict(list)
         for (etype, pent), ele in self._elenodes.items():
             petype = self._etype_map[etype][0]
 
@@ -238,25 +238,22 @@ class NodesAssembler(object):
                 elm['elm_{}_p0'.format(petype)] = ele
             else:
                 bname = self._bfacespents[pent]
-                bface['{}_{}'.format(bname, petype)] = ele
+                bnode[bname].append(np.unique(ele.ravel()))
 
-        return elm, bface
+        bnode = {k : np.concatenate(v) for k, v in bnode.items()}
+
+        return elm, bnode
 
     def get_nodes(self):
         key = np.array(list(self._nodepts.keys()), dtype='i4')
         vals = np.array(list(self._nodepts.values()))*self._scale
 
         ret = {'node_p0': vals, 'nmap_p0': key}
-        elm, bface = self._fluid_elm()
+        elm, bnode = self._fluid_elm()
         ret.update(elm)
-        ret.update(self._extract_bnodes(bface))
+        ret.update(self._extract_bnodes(bnode))
 
         return ret
 
-    def _extract_bnodes(self, bface):
-        _etype_ndim = {'line' : 2,  'tri': 3, 'quad': 3}
-
-        return {'bface_'+ k : np.rollaxis(np.array(
-                [[self._nodepts[e] for e in l] for l in v]), 1
-                )[:,:,:_etype_ndim[k.split('_')[-1]]] 
-            for k, v in bface.items()}
+    def _extract_bnodes(self, bnode):
+        return {'bnode_' + k : np.array([self._nodepts[e] for e in v]) for k, v in bnode.items()}

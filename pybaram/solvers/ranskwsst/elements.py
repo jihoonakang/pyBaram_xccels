@@ -6,6 +6,7 @@ from pybaram.utils.nb import dot
 from pybaram.utils.np import eps
 
 import numpy as np
+import time
 
 
 class RANSKWSSTFluidElements(ViscousFluidElements):
@@ -192,7 +193,7 @@ class RANSKWSSTElements(BaseAdvecDiffElements, RANSKWSSTFluidElements):
         #self.ydist[:] = self._wall_distance(xw)
         self._wall_distance(xw, self.ydist)
 
-        super().construct_kernels(vertex, xw, nreg)
+        super().construct_kernels(vertex, nreg)
 
         # Viscosity
         self.mu, self.mut = aux[1], aux[2]
@@ -210,14 +211,45 @@ class RANSKWSSTElements(BaseAdvecDiffElements, RANSKWSSTFluidElements):
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.mu, self.mut, self.dt)
 
-    def _wall_distance(self, xw, ydist):
-        import time
-        print('Wall distance started')
+    def _wall_distance(self, xw, wdist):
         t0 = time.time()
-        eles = self.eles.swapaxes(0, 1)[:,:,None]
-        xw = xw[None, :]
-        ydist[:] = np.array([np.average(np.linalg.norm(xc - xw, axis=2).min(axis=1)) for xc in eles])
-        print('Completed Wall distance', time.time() - t0)
+
+        # _wdist 함수 상수
+        nf, ne, nd = self.eles.shape
+        nw = xw.shape[0]
+        eles = self.eles
+        rcp_nf = 1.0 / nf
+        xmax = 2*(eles.max() - eles.min())
+
+        def _cal_wdist(i_begin, i_end, wdist):
+            # Brute-force searching
+            for idx in range(i_begin, i_end):
+                wd_ele = 0
+                for jdx in range(nf):
+                    # for all node points
+                    xc = eles[jdx, idx]
+                    
+                    # Compute minimum wall distance for each node
+                    wd_node = xmax
+                    for kdx in range(nw):
+                        xwi = xw[kdx]                      
+                        
+                        # 길이 계산
+                        dx = 0
+                        for i in range(nd):
+                            dx += (xwi[i] - xc[i])**2
+
+                        dx = np.sqrt(dx)
+                        wd_node = min(dx, wd_node)
+
+                    # Averaging for cell
+                    wd_ele += wd_node
+
+                wd_ele *= rcp_nf
+                wdist[idx] = wd_ele
+
+        self.be.make_loop(ne, _cal_wdist)(wdist)
+        print('Wall distance calculated : {:2f} s'.format(time.time()-t0))
 
     def _make_timestep(self):
         ndims, nface = self.ndims, self.nface

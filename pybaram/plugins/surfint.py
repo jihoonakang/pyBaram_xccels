@@ -33,18 +33,19 @@ class SurfIntPlugin(BasePlugin):
 
         # Get idx, norm
         self._bcinfo = bcinfo = {}
-
-        bc = bcmap[suffix]
-        t, e, _ = bc._lidx
-        mag, vec = bc._mag_snorm, bc._vec_snorm
-
         area = 0
-        for i in np.unique(t):
-            mask = (t == i)
-            eidx = e[mask]
-            nvec, nmag = vec[:, mask], mag[mask]
-            bcinfo[i] = (eidx, nvec, nmag)
-            area += np.sum(nmag)
+
+        if suffix in bcmap:
+            bc = bcmap[suffix]
+            t, e, _ = bc._lidx
+            mag, vec = bc._mag_snorm, bc._vec_snorm
+
+            for i in np.unique(t):
+                mask = (t == i)
+                eidx = e[mask]
+                nvec, nmag = vec[:, mask], mag[mask]
+                bcinfo[i] = (eidx, nvec, nmag)
+                area += np.sum(nmag)
 
         # Compute surface area
         area = np.array(area)

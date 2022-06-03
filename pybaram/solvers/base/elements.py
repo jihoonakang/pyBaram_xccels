@@ -187,18 +187,13 @@ class BaseElements:
     def _prelsq(self):
         dxc = np.rollaxis(self.dxc, 2)
 
-        # TODO:Inverse distance weight
-        w =  1.0 #1.0 / np.linalg.norm(dxc, axis=0)
-        dxc = dxc * w
-
         # Least square matrix [dx*dy] and its inverse
         lsq = np.array([[np.einsum('ij,ij->j', x, y)
                          for y in dxc] for x in dxc])
         invlsq = np.linalg.inv(np.rollaxis(lsq, 2))
 
         # Final form: lsq^-1*dx
-        return np.einsum('kij,jmk->imk', invlsq, dxc*w)
-
+        return np.einsum('kij,jmk->imk', invlsq, dxc)
     @property
     @fc.lru_cache()
     def dxf(self):

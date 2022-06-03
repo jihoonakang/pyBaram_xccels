@@ -46,21 +46,22 @@ class ForcePlugin(BasePlugin):
         # Get idx, norm
         self._bcinfo = bcinfo = {}
 
-        bc = bcmap[suffix]
-        t, e, _ = bc._lidx
-        mag, vec = bc._mag_snorm, bc._vec_snorm
+        if suffix in bcmap:
+            bc = bcmap[suffix]
+            t, e, _ = bc._lidx
+            mag, vec = bc._mag_snorm, bc._vec_snorm
 
-        for i in np.unique(t):
-            mask = (t == i)
-            eidx = e[mask]
-            nvec, nmag = vec[:, mask], mag[mask]
+            for i in np.unique(t):
+                mask = (t == i)
+                eidx = e[mask]
+                nvec, nmag = vec[:, mask], mag[mask]
 
-            if not self.viscous:
-                bcinfo[i] = (eidx, nvec*nmag)
-            else:
-                # Get first height length
-                dxn = np.linalg.norm(bc._dx_adj[:, mask], axis=0)/2
-                bcinfo[i] = (eidx, nvec, nmag, dxn)
+                if not self.viscous:
+                    bcinfo[i] = (eidx, nvec*nmag)
+                else:
+                    # Get first height length
+                    dxn = np.linalg.norm(bc._dx_adj[:, mask], axis=0)/2
+                    bcinfo[i] = (eidx, nvec, nmag, dxn)
 
         # Get integration mode
         self.mode = intg.mode

@@ -104,8 +104,8 @@ class EulerElements(BaseAdvecElements, FluidElements):
         cfg.get('constants', 'pmin', '1e-15')
         self._const = cfg.items('constants')
 
-    def construct_kernels(self, vertex, xw, nreg):
-        super().construct_kernels(vertex, xw, nreg)
+    def construct_kernels(self, vertex, nreg):
+        super().construct_kernels(vertex, nreg)
 
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.dt)

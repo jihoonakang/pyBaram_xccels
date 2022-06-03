@@ -34,8 +34,8 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         cfg.get('constants', 'pmin', '1e-15')
         self._const = cfg.items('constants')
 
-    def construct_kernels(self, vertex, xw, nreg):
-        super().construct_kernels(vertex, xw, nreg)
+    def construct_kernels(self, vertex, nreg):
+        super().construct_kernels(vertex, nreg)
 
         # Aux array
         nauxvars = len(self.auxvars)

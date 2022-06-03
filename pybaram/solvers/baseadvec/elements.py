@@ -8,7 +8,7 @@ from pybaram.utils.np import eps
 
 
 class BaseAdvecElements(BaseElements):
-    def construct_kernels(self, vertex, xw, nreg):
+    def construct_kernels(self, vertex, nreg):
         self.vertex = vertex
 
         # Upts : Solution vector

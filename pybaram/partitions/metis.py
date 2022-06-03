@@ -21,6 +21,7 @@ class METISPartition:
         newm.update(self.partition_cons(msh, eidx_g2l))
         newm.update(self.partition_bcons(msh, eidx_g2l))
         newm.update(self.partition_vtx(msh, eidx_g2l))
+        self.copy_bnode(msh, newm)
 
         newm['mesh_uuid'] = np.array(str(uuid.uuid4()), dtype='S')
 
@@ -175,3 +176,8 @@ class METISPartition:
                 new[k] = np.array(v, dtype='i4')
 
         return new
+
+    def copy_bnode(self, msh, newm):
+        for k in msh:
+            if k.startswith('bnode'):
+                newm[k] = msh[k]

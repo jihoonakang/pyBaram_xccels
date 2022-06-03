@@ -40,7 +40,7 @@ class BaseSystem:
         self.iint = self.load_int_inters(msh, be, cfg, rank, elemap)
 
         # load bc
-        self.bint = bint = self.load_bc_inters(msh, be, cfg, rank, elemap)
+        self.bint = self.load_bc_inters(msh, be, cfg, rank, elemap)
 
         # load mpiint
         self.mpiint = self.load_mpi_inters(msh, be, cfg, rank, elemap)
@@ -48,14 +48,8 @@ class BaseSystem:
         # Load vertex
         self.vertex = vertex = self.load_vertex(msh, be, cfg, rank, elemap)
 
-        # Compute wall boundary
-        if hasattr(self, 'compute_bc_wall'):
-            xw = self.compute_bc_wall(bint)
-        else:
-            xw = None
-
         # Construct kerenls
-        self.eles.construct_kernels(vertex, xw, nreg)
+        self.eles.construct_kernels(vertex, nreg)
         self.iint.construct_kernels(elemap)
         self.bint.construct_kernels(elemap)
 
