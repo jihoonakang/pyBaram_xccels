@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-from pybaram.solvers.baseadvecdiff import BaseAdvecDiffElements
+from pybaram.solvers.rans import RANSElements
 from pybaram.solvers.navierstokes import ViscousFluidElements
 from pybaram.backends.types import Kernel
 from pybaram.utils.nb import dot
 from pybaram.utils.np import eps
 
 import numpy as np
-import time
 
 
 class RANSSAFluidElements(ViscousFluidElements):
@@ -38,7 +37,7 @@ class RANSSAFluidElements(ViscousFluidElements):
         cv1 = self._turb_coeffs['cv1']
         cv13 = cv1**3
 
-        def mut(u, mu):
+        def mut(u, g, mu, *args):
             # Dynamic viscosity
             rho, nut = u[0], u[nvars-1]
             nu = mu/rho
@@ -63,7 +62,7 @@ class RANSSAFluidElements(ViscousFluidElements):
         return self.be.compile(tflux)
 
     def turb_src_container(self):
-        from pybaram.solvers.ranssa.turbulent import make_vorticity
+        from pybaram.solvers.rans.turbulent import make_vorticity
         from pybaram.utils.np import eps
         
         ndims, nvars = self.ndims, self.nvars
@@ -82,7 +81,7 @@ class RANSSAFluidElements(ViscousFluidElements):
                     **self._turb_coeffs}
         _vorticity = make_vorticity(self.be, cplargs)
 
-        def src(uc, gc, mu, d, rhs, dsrc):
+        def src(uc, gc, mu, mut, d, rhs, dsrc):
             # nut and dnut
             nut = uc[nvars-1]
             dnut2 = 0
@@ -137,20 +136,16 @@ class RANSSAFluidElements(ViscousFluidElements):
             if p < pmin:
                 u[nfvars - 1] = pmin/(gamma-1) + 0.5*dot(u, u, ndims, 1, 1)/rho
             
-            #u[nvars-1] = max(eps, u[nvars-1])
-            if u[nvars-1] < 10*eps:
-                u[nvars-1] = 10*eps
+            u[nvars-1] = max(eps, u[nvars-1])
+            #if u[nvars-1] < 10*eps:
+            #    u[nvars-1] = 10*eps
 
         return self.be.compile(fix_nonPhy)
 
-class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
+
+class RANSSAElements(RANSElements, RANSSAFluidElements):
     def __init__(self, be, cfg, name, eles, vcon):
         super().__init__(be, cfg, name, eles, vcon)
-        self.nvars = len(self.primevars)
-        self.nfvars = self.nvars - self.nturbvars
-
-        # Constants
-        cfg.get('constants', 'pmin', '1e-4')
 
         # SA Constants
         # See https://turbmodels.larc.nasa.gov/spalart.html#sa
@@ -167,156 +162,20 @@ class RANSSAElements(BaseAdvecDiffElements, RANSSAFluidElements):
 
         self._const = cfg.items('constants')
         self._turb_coeffs = cfg.items(sect)
-
-    def construct_kernels(self, vertex, xw, nreg):
-        # Aux array
-        nauxvars = len(self.auxvars)
-        self.aux = aux = np.empty((nauxvars, self.neles))
-
-        # 벽면까지 길이 계산
-        self.ydist = aux[0]
-        #self.ydist[:] = self._wall_distance(xw)
-        self._wall_distance(xw, self.ydist)
-
-        # Viscosity
-        self.mu, self.mut = aux[1], aux[2]
-
-        super().construct_kernels(vertex, nreg)
-
-        # Kernel argument 조절 및 Aux variable 초기화
-        self.post.update_args(self.upts_in, self.mu, self.mut)
-        self.post()
-
-        self.div_upts.update_args(
-            self.upts_out, self.fpts, self.upts_in, self.grad,
-            self.dsrc, self.mu
-        )
-
-        # Timestep Kernel argument 조절
-        self.timestep = Kernel(self._make_timestep(),
-                               self.upts_in, self.mu, self.mut, self.dt)
-
-    def _wall_distance(self, xw, wdist):
-        t0 = time.time()
-
-        # _wdist 함수 상수
-        nf, ne, nd = self.eles.shape
-        nw = xw.shape[0]
-        eles = self.eles
-        rcp_nf = 1.0 / nf
-        xmax = 2*(eles.max() - eles.min())
-
-        def _cal_wdist(i_begin, i_end, wdist):
-            # Brute-force searching
-            for idx in range(i_begin, i_end):
-                wd_ele = 0
-                for jdx in range(nf):
-                    # for all node points
-                    xc = eles[jdx, idx]
-                    
-                    # Compute minimum wall distance for each node
-                    wd_node = xmax
-                    for kdx in range(nw):
-                        xwi = xw[kdx]                      
-                        
-                        # 길이 계산
-                        dx = 0
-                        for i in range(nd):
-                            dx += (xwi[i] - xc[i])**2
-
-                        dx = np.sqrt(dx)
-                        wd_node = min(dx, wd_node)
-
-                    # Averaging for cell
-                    wd_ele += wd_node
-
-                wd_ele *= rcp_nf
-                wdist[idx] = wd_ele
-
-        self.be.make_loop(ne, _cal_wdist)(wdist)
-        print('Wall distance calculated : {:2f} s'.format(time.time()-t0))
-        
-    def _make_div_upts(self):
-        ndims, nvars, nface = self.ndims, self.nvars, self.nface
-
-        rcp_vol = self.rcp_vol
-        ydist = self.ydist
-
-        turb_src = self.turb_src_container()
-
-        def _div_upts(i_begin, i_end, rhs, fpts, upts, grad, dsrc, mu, t=0):
-            for idx in range(i_begin, i_end):
-                rcp_voli = rcp_vol[idx]
-                for jdx in range(nvars):
-                    tmp = 0.0
-                    for kdx in range(nface):
-                        tmp += fpts[kdx, jdx, idx]
-
-                    rhs[jdx, idx] = -rcp_voli*tmp
-
-                # Turbulence source term
-                turb_src(upts[:, idx], grad[:, :, idx], mu[idx],
-                         ydist[idx], rhs[:, idx], dsrc[:, idx])
-
-        return self.be.make_loop(self.neles, _div_upts)
-
+    
     def _make_post(self):
         _fix_nonPys = self.fix_nonPys_container()
         _compute_mu = self.mu_container()
         _compute_mut = self.mut_container()
 
-        def post(i_begin, i_end, upts, mu, mut):
+        def post(i_begin, i_end, upts, grad, mu, mut):
             # Update
             for idx in range(i_begin, i_end):
                 _fix_nonPys(upts[:, idx])
                 mu[idx] = _compute_mu(upts[:, idx])
-                mut[idx] = _compute_mut(upts[:, idx], mu[idx])
+                mut[idx] = _compute_mut(upts[:, idx], None, mu[idx])
 
         return self.be.make_loop(self.neles, post)   
-
-    def _make_timestep(self):
-        ndims, nface = self.ndims, self.nface
-        nflvars = self.nfvars
-        vol = self._vol
-        smag, svec = self._gen_snorm_fpts()
-        gamma, pmin = self._const['gamma'], self._const['pmin']
-        pr, prt = self._const['pr'], self._const['prt']
-
-        def timestep(i_begin, i_end, u, mu, mut, dt, cfl):
-            for idx in range(i_begin, i_end):
-                rho = u[0, idx]
-                et = u[nflvars-1, idx]
-                rv2 = dot(u[:, idx], u[:, idx], ndims, 1, 1)/rho
-
-                p = max((gamma - 1)*(et - 0.5*rv2), pmin)
-                c = np.sqrt(gamma*p/rho)
-
-                sum_lamdf = 0.0
-                for jdx in range(nface):
-                    lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1)) + c
-                    lamdf += (1/rho*max(4/3, gamma)*(mu[idx]/pr + mut[idx]/prt)*
-                              smag[jdx, idx]/vol[idx])
-                    sum_lamdf += lamdf*smag[jdx, idx]
-
-                dt[idx] = cfl*vol[idx] / sum_lamdf
-
-        return self.be.make_loop(self.neles, timestep)
-
-    def make_wave_speed(self):
-        ndims, nfvars = self.ndims, self.nfvars
-        gamma, pmin = self._const['gamma'], self._const['pmin']
-        pr, prt = self._const['pr'], self._const['prt']
-
-        def _lambdaf(u, nf, dx, idx, mu, mut):
-            rho, et = u[0], u[nfvars-1]
-
-            contra = dot(u, nf, ndims, 1)/rho
-            p = max((gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho), pmin)
-            c = np.sqrt(gamma*p/rho)
-
-            return abs(contra) + c + 1/dx/rho * max(4/3, gamma)*(mu[idx]/pr + mut[idx]/prt)
-
-        return self.be.compile(_lambdaf)
 
     def make_turb_wave_speed(self):
         ndims, nvars = self.ndims, self.nvars
