@@ -4,7 +4,6 @@ from pybaram.backends.types import Kernel
 from pybaram.utils.nb import dot
 
 import numpy as np
-import time
 
 
 class RANSElements(BaseAdvecDiffElements):
@@ -49,8 +48,6 @@ class RANSElements(BaseAdvecDiffElements):
                                     self.upts_in, self.mu, self.mut, self.turb_dt)
 
     def _wall_distance(self, xw, wdist):
-        t0 = time.time()
-
         # _wdist 함수 상수
         nf, ne, nd = self.eles.shape
         nw = xw.shape[0]
@@ -86,7 +83,7 @@ class RANSElements(BaseAdvecDiffElements):
                 wdist[idx] = wd_ele
 
         self.be.make_loop(ne, _cal_wdist)(wdist)
-        print('Wall distance calculated : {:2f} s'.format(time.time()-t0))
+
 
     def make_wave_speed(self):
         ndims, nfvars = self.ndims, self.nfvars
