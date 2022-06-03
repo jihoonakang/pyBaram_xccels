@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from sympy import re
 from pybaram.solvers.baseadvecdiff.system import BaseAdvecDiffSystem
 from pybaram.solvers.rans import RANSElements, RANSIntInters, RANSBCInters, RANSMPIInters
 from pybaram.backends.types import Queue
