@@ -274,7 +274,7 @@ class LUSGS(BaseSteadyIntegrator):
 
                 pre_tlusgs = Kernel(
                     be.make_loop(ele.neles, _pre_tlusgs), 
-                    ele.upts[0], ele.dt, diag, lambdaf, mu, mut
+                    ele.upts[0], ele.turb_dt, diag, lambdaf, mu, mut
                 )                
                 tlsweeps = Kernel(be.make_loop(ele.neles, func=_tlsweep),
                     ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf) 

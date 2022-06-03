@@ -43,6 +43,10 @@ class RANSElements(BaseAdvecDiffElements):
         # Timestep Kernel argument 조절
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.mu, self.mut, self.dt)
+        
+        self.turb_dt = np.empty(self.neles)
+        self.turb_timestep = Kernel(self._make_turb_timestep(),
+                                    self.upts_in, self.mu, self.mut, self.turb_dt)
 
     def _wall_distance(self, xw, wdist):
         t0 = time.time()

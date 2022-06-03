@@ -70,36 +70,6 @@ class RANSKWSSTMPIInters(RANSMPIInters, RANSKWSSTInters):
 class RANSKWSSTBCInters(RANSBCInters, RANSKWSSTInters):
     _get_bc = get_bc
 
-    def _make_delu(self):
-        nvars, ndims = self.nvars, self.ndims
-        lt, le, lf = self._lidx
-        nf = self._vec_snorm
-        ydist = self.ydist
-
-        # Compile functions
-        compute_mu = self.ele0.mu_container()
-
-        bc = self.bc
-
-        def compute_delu(i_begin, i_end, *uf):
-            ur = np.empty(nvars)
-
-            for idx in range(i_begin, i_end):
-                nfi = nf[:, idx]
-
-                lti, lfi, lei = lt[idx], lf[idx], le[idx]
-
-                ul = uf[lti][lfi, :, lei]
-                
-                mul = compute_mu(ul)
-                bc(ul, ur, nfi, mul, ydist[idx])
-
-                for jdx in range(nvars):
-                    du = ur[jdx] - ul[jdx]
-                    uf[lti][lfi, jdx, lei] = du
-
-        return self.be.make_loop(self.nfpts, compute_delu)
-
 
 class RANSKWSSTSlipWallBCInters(RANSKWSSTBCInters, RANSSlipWallBCInters):
     pass

@@ -208,3 +208,25 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
             return abs(contra) + 1/dx*(mu[idx] + mut[idx])/rho/sigma
 
         return self.be.compile(_lambdaf)
+
+    def _make_turb_timestep(self):
+        ndims, nface = self.ndims, self.nface
+        sigma = 1.0
+
+        vol = self._vol
+        smag, svec = self._gen_snorm_fpts()
+
+        def timestep(i_begin, i_end, u, mu, mut, dt, cfl):
+            for idx in range(i_begin, i_end):
+                rho = u[0, idx]
+                nu = (mu[idx] + mut[idx])/rho
+
+                sum_lamdf = 0.0
+                for jdx in range(nface):
+                    lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1))
+                    lamdf += nu/sigma*smag[jdx, idx]/vol[idx]
+                    sum_lamdf += lamdf*smag[jdx, idx]
+                
+                dt[idx] = cfl*vol[idx] / sum_lamdf
+        
+        return self.be.make_loop(self.neles, timestep)
