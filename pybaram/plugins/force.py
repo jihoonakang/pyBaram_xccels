@@ -22,6 +22,7 @@ class ForcePlugin(BasePlugin):
         const = cfg.items('constants')
         rho = npeval(cfg.get(sect, 'rho', 1.0), const)
         vel = npeval(cfg.get(sect, 'vel', 1.0), const)
+        self._p0 = npeval(cfg.get(sect, 'p', 0.0), const)
         area = npeval(cfg.get(sect, 'area', 1.0), const)
         self._rcp_dynp = 1.0/(0.5*rho*vel**2*area)
 
@@ -99,12 +100,13 @@ class ForcePlugin(BasePlugin):
         solns = list(intg.curr_soln)
 
         # Force 계산
+        p0 = self._p0
         pforce = []
         if not self.viscous:
             for i, (eidx, norm) in self._bcinfo.items():
                 soln = solns[i]
                 p = eles[i].conv_to_prim(soln[:, eidx], self.cfg)[1]
-                pforce.append(np.sum(p*norm, axis=1))
+                pforce.append(np.sum((p-p0)*norm, axis=1))
         else:
             # Get viscosity
             mus = list(intg.curr_mu)
@@ -119,7 +121,7 @@ class ForcePlugin(BasePlugin):
                 # Tangential velocity
                 vt = uvw - np.einsum('ij,ij->j', nvec, uvw)*nvec
                 tau = mu*vt/dxn
-                pforce.append(np.sum(p*nvec*nmag, axis=1))
+                pforce.append(np.sum((p-p0)*nvec*nmag, axis=1))
                 vforce.append(np.sum(tau*nmag, axis=1))
 
         # 계수 계산
