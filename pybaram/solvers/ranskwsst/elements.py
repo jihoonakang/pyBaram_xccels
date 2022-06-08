@@ -41,17 +41,22 @@ class RANSKWSSTFluidElements(ViscousFluidElements):
         _f2 = make_blendingF2(self.be, cplargs)
 
         a1 = self._turb_coeffs['a1']
+        mut_max = self._turb_coeffs['mut_limit']*self._const['mu']
 
-        def mut(uc, gc, mu, d):
+        def _mut(uc, gc, mu, d):
             w = uc[-1] / uc[0]
             rk = uc[-2]
 
             omega = _vorticity(uc, gc)
             f2 = _f2(uc, mu, d)
 
-            return a1*rk / max(a1*w, f2*omega)
+            # Turbulence viscosity
+            mut = a1*rk / max(a1*w, f2*omega)
 
-        return self.be.compile(mut)
+            # Limit mut (non-zero, below muf*limit)
+            return min(max(eps, mut), mut_max)
+
+        return self.be.compile(_mut)
 
     def tflux_container(self):
         ndims, nvars = self.ndims, self.nvars
@@ -163,6 +168,9 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
         cfg.get(sect, 'betast', '0.09')
         cfg.get(sect, 'kappa', '0.41')
         cfg.get(sect, 'a1', '0.31')
+
+        # Turbulent viscosity
+        cfg.get(sect, 'mut_limit', '1e5')
         
         self._turb_coeffs = cfg.items(sect)
 
@@ -183,7 +191,6 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
         _compute_mut = self.mut_container()
 
         ydist = self.ydist
-        muf = self._const['mu']
 
         def post(i_begin, i_end, upts, grad, mu, mut):
             # Update
@@ -193,7 +200,6 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
                 mut[idx] = _compute_mut(
                     upts[:, idx], grad[:,:,idx], mu[idx], ydist[idx]
                 )
-                mut[idx] = min(mut[idx], 100000*muf)
 
         return self.be.make_loop(self.neles, post)
     

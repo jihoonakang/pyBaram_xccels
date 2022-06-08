@@ -5,8 +5,6 @@ from pybaram.backends.types import Kernel
 from pybaram.utils.nb import dot
 from pybaram.utils.np import eps
 
-import numpy as np
-
 
 class RANSSAFluidElements(ViscousFluidElements):
     name = 'rans-sa'
