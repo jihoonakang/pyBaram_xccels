@@ -38,7 +38,7 @@ class CGNSZoneReader(object):
                 if ((elerng[0] <= bcrng[0]) and (bcrng[0] <= elerng[1])) or ((elerng[0] <= bcrng[1]) and (bcrng[1] <= elerng[1])):
                     name = bcname
                     bclist = np.array(bclist)
-                    picks = bclist[bclist < elerng[1] + 1] - elerng[0]
+                    picks = bclist[(bclist >= elerng[0]) & (bclist < elerng[1] + 1)] - elerng[0]
                     break
             else:
                 name = 'fluid'
