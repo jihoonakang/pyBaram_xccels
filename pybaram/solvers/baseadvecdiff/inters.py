@@ -2,10 +2,8 @@
 from pybaram.solvers.baseadvec import BaseAdvecIntInters, BaseAdvecBCInters, BaseAdvecMPIInters
 from pybaram.backends.types import Kernel
 from pybaram.utils.nb import dot
-from pybaram.utils.np import npeval
 
 import numpy as np
-import re
 
 
 class BaseAdvecDiffIntInters(BaseAdvecIntInters):

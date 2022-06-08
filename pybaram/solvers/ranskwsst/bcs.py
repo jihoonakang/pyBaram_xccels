@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from pybaram.utils.nb import dot
 from pybaram.solvers.euler.bcs import (make_bc_far, make_bc_sup_out, make_bc_sup_in,
                                        make_bc_sub_inv, make_bc_sub_outp, make_bc_slip_wall)
 

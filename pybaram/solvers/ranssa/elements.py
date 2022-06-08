@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from pybaram.solvers.rans import RANSElements
 from pybaram.solvers.navierstokes import ViscousFluidElements
-from pybaram.backends.types import Kernel
 from pybaram.utils.nb import dot
 from pybaram.utils.np import eps
 

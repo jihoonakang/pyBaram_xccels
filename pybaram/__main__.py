@@ -1,5 +1,4 @@
 from argparse import ArgumentParser, FileType
-from gc import callbacks
 from mpi4py import MPI
 
 from pybaram.inifile import INIFile
