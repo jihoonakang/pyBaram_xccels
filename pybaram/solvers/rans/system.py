@@ -79,8 +79,3 @@ class RANSSystem(BaseAdvecDiffSystem):
         bnode = self._comm.bcast(bnode, root=0)
 
         return bnode
-
-    def timestep(self, cfl, idx_in=0):
-        self.eles.upts_in.idx = idx_in
-        self.eles.timestep(cfl)
-        self.eles.turb_timestep(cfl)

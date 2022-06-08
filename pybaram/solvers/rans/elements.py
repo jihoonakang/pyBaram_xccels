@@ -42,10 +42,6 @@ class RANSElements(BaseAdvecDiffElements):
         # Timestep Kernel argument 조절
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.mu, self.mut, self.dt)
-        
-        self.turb_dt = np.empty(self.neles)
-        self.turb_timestep = Kernel(self._make_turb_timestep(),
-                                    self.upts_in, self.mu, self.mut, self.turb_dt)
 
     def _wall_distance(self, xw, wdist):
         # _wdist 함수 상수
@@ -83,7 +79,6 @@ class RANSElements(BaseAdvecDiffElements):
                 wdist[idx] = wd_ele
 
         self.be.make_loop(ne, _cal_wdist)(wdist)
-
 
     def make_wave_speed(self):
         ndims, nfvars = self.ndims, self.nfvars
