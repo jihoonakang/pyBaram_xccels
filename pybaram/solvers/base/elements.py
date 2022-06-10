@@ -185,15 +185,30 @@ class BaseElements:
     @fc.lru_cache()
     @chop
     def _prelsq(self):
-        dxc = np.rollaxis(self.dxc, 2)
+        dxc = self.dxc.swapaxes(1, 2)
+        nface, ndims = self.nface, self.ndims
+        invlsq = np.empty((ndims, nface, self.neles))
 
-        # Least square matrix [dx*dy] and its inverse
-        lsq = np.array([[np.einsum('ij,ij->j', x, y)
-                         for y in dxc] for x in dxc])
-        invlsq = np.linalg.inv(np.rollaxis(lsq, 2))
+        # Inverse distance weighting
+        w = 1 / np.linalg.norm(dxc, axis=1)
+        dxc *= w[:,None]
 
-        # Final form: lsq^-1*dx
-        return np.einsum('kij,jmk->imk', invlsq, dxc)
+        def _cal(i_begin, i_end, invlsq):
+            q, r = np.empty((nface, ndims)), np.empty((ndims, ndims))
+            for idx in range(i_begin, i_end):
+                q[:], r[:] = np.linalg.qr(dxc[:,:,idx])
+                invlsq[:,:, idx] = np.dot(np.linalg.inv(r), q.T)
+
+                for jdx in range(nface):
+                    wi = w[jdx, idx]
+                    for kdx in range(ndims):
+                        invlsq[kdx, jdx, idx] *= wi
+
+        # Compile and run
+        self.be.make_loop(self.neles, _cal)(invlsq)
+        
+        return invlsq
+
     @property
     @fc.lru_cache()
     def dxf(self):
