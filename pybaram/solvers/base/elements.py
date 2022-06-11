@@ -24,10 +24,14 @@ class BaseElements:
         self.geom = get_geometry(name)
         self.nface = nface = self.geom.nface
 
+        # Order
         self.order = order = cfg.getint('solver', 'order', 1)
 
         if order > 1:
             self.dxc = self.xc - self.xf
+
+        # Gradient method
+        self._grad_method = cfg.get('solver', 'gradient', 'hybrid').lower()
 
         # ifpts
         #if cfg.get('solver-time-integrator', 'stepper') == 'simple-point-implicit':
@@ -185,29 +189,55 @@ class BaseElements:
     @fc.lru_cache()
     @chop
     def _prelsq(self):
-        dxc = self.dxc.swapaxes(1, 2)
-        nface, ndims = self.nface, self.ndims
-        invlsq = np.empty((ndims, nface, self.neles))
+        # Difference of displacement vector (cell to cell)
+        dxc = np.rollaxis(self.dxc, 2)
+        distance = np.linalg.norm(dxc, axis=0)
 
-        # Inverse distance weighting
-        w = 1 / np.linalg.norm(dxc, axis=1)
-        dxc *= w[:,None]
+        # Normal vector and volume
+        snorm_mag = self._mag_snorm_fpts
+        snorm_vec = np.rollaxis(self._vec_snorm_fpts, 2)
+        vol = self._vol
 
-        def _cal(i_begin, i_end, invlsq):
-            q, r = np.empty((nface, ndims)), np.empty((ndims, ndims))
-            for idx in range(i_begin, i_end):
-                q[:], r[:] = np.linalg.qr(dxc[:,:,idx])
-                invlsq[:,:, idx] = np.dot(np.linalg.inv(r), q.T)
+        if self._grad_method == 'least-square':
+            beta, w = 1.0, 1.0
+        elif self._grad_method == 'weighted-least-square':
+            # Invserse distance weight
+            beta, w = 1.0, 1/distance**2
+        elif self._grad_method == 'green-gauss':
+            beta, w = 0.0, 1.0
+        elif self._grad_method == 'hybrid':
+            # Shima et al., Green–Gauss/Weighted-Least-Squares
+            # Hybrid Gradient Reconstruction for
+            # Arbitrary Polyhedra Unstructured Grids, AIAA J., 2013
+            # WLSQ(G)
+            dxf = self.dxf.swapaxes(0, 1)
 
-                for jdx in range(nface):
-                    wi = w[jdx, idx]
-                    for kdx in range(ndims):
-                        invlsq[kdx, jdx, idx] *= wi
+            dxcn = np.einsum('ijk,ijk->jk', dxc, snorm_vec)
+            dxfn = np.einsum('ijk,ijk->jk', dxf, snorm_vec)
 
-        # Compile and run
-        self.be.make_loop(self.neles, _cal)(invlsq)
-        
-        return invlsq
+            w =  (2*dxfn/dxcn)**2*snorm_mag / distance
+
+            # Compute blending function (GLSQ)
+            ar = 2*np.linalg.norm(self.dxf, axis=1).max(axis=0)*snorm_mag.max(axis=0)/vol
+            beta = np.minimum(1, 2/ar)
+        else:
+            raise ValueError("Invalid gradient method : ", self._grad_method)
+
+        # Scaled dxc vector
+        dxcs = dxc*np.sqrt(w)
+
+        # Least square matrix [dx*dy] and its inverse
+        lsq = np.array([[np.einsum('ij,ij->j', x, y)
+                         for y in dxcs] for x in dxcs])
+
+        # Hybrid type of Ax=b
+        A = beta*lsq + 2*(1-beta)*vol*np.eye(self.ndims)[:,:,None]
+        b = beta*dxc*w + 2*(1-beta)*0.5*snorm_vec*snorm_mag
+
+        # Solve Ax=b
+        op = np.linalg.solve(np.rollaxis(A, axis=2), np.rollaxis(b, axis=2)).transpose(1,2,0)
+
+        return op
 
     @property
     @fc.lru_cache()

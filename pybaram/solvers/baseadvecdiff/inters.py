@@ -32,6 +32,7 @@ class BaseAdvecDiffIntInters(BaseAdvecIntInters):
         # Mangitude and direction of the connecting vector
         inv_tf = 1/np.linalg.norm(self._dx_adj, axis=0)
         tf = self._dx_adj * inv_tf
+        avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 
         def grad_at(i_begin, i_end, gradf, *uf):
             # Parse element views (fpts, grad)
@@ -45,6 +46,7 @@ class BaseAdvecDiffIntInters(BaseAdvecIntInters):
 
                 tfi = tf[:, idx]
                 inv_tfi = inv_tf[idx]
+                aveci = avec[:, idx]
 
                 # Compute the average of gradient at face
                 for jdx in range(nvars):
@@ -58,7 +60,7 @@ class BaseAdvecDiffIntInters(BaseAdvecIntInters):
                     # Compute gradient with jump term
                     for kdx in range(ndims):
                         gf[kdx] -= (gft - du[lti][lfi, jdx, lei]
-                                    * inv_tfi)*tfi[kdx]
+                                    * inv_tfi)*aveci[kdx]
                         gradf[kdx, jdx, idx] = gf[kdx]
 
         return self.be.make_loop(self.nfpts, grad_at)
@@ -102,6 +104,7 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
         # Mangitude and direction of the connecting vector
         inv_tf = 1/np.linalg.norm(self._dx_adj, axis=0)
         tf = self._dx_adj * inv_tf
+        avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 
         def grad_at(i_begin, i_end, gradf, grad_rhs, *du):
             gf = np.empty(ndims)
@@ -111,6 +114,7 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
 
                 tfi = tf[:, idx]
                 inv_tfi = inv_tf[idx]
+                aveci = avec[:, idx]
 
                 # Compute the average of gradient at face
                 for jdx in range(nvars):
@@ -123,7 +127,7 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
                     # Compute gradient with jump term
                     for kdx in range(ndims):
                         gf[kdx] -= (gft - du[lti][lfi, jdx, lei]
-                                    * inv_tfi)*tfi[kdx]
+                                    * inv_tfi)*aveci[kdx]
 
                         gradf[kdx, jdx, idx] = gf[kdx]
 
@@ -171,6 +175,7 @@ class BaseAdvecDiffBCInters(BaseAdvecBCInters):
         # Mangitude and direction of the connecting vector
         inv_tf = 1/np.linalg.norm(self._dx_adj, axis=0)
         tf = self._dx_adj * inv_tf
+        avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 
         def grad_at(i_begin, i_end, gradf, *uf):
             # Parse element views (fpts, grad)
@@ -183,6 +188,7 @@ class BaseAdvecDiffBCInters(BaseAdvecBCInters):
 
                 tfi = tf[:, idx]
                 inv_tfi = inv_tf[idx]
+                aveci = avec[:, idx]
 
                 # Compute the average of gradient at face
                 for jdx in range(nvars):
@@ -194,7 +200,7 @@ class BaseAdvecDiffBCInters(BaseAdvecBCInters):
                     # Compute gradient with jump term
                     for kdx in range(ndims):
                         gf[kdx] -= (gft - du[lti][lfi, jdx, lei]
-                                    * inv_tfi)*tfi[kdx]
+                                    * inv_tfi)*aveci[kdx]
                         gradf[kdx, jdx, idx] = gf[kdx]
 
         return self.be.make_loop(self.nfpts, grad_at)
