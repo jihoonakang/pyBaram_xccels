@@ -37,7 +37,18 @@ class BaseSteadyIntegrator(BaseIntegrator):
         super().__init__(be, cfg, msh, soln, comm)
 
         # Get CFL
-        self._cfl = cfg.getfloat('solver-time-integrator', 'cfl', 1.0)
+        self._cfl0 = cfg.getfloat('solver-time-integrator', 'cfl', 1.0)
+
+        # Get CFL linear ramp
+        self._cfl_iter0 = cfg.getint('solver-cfl-ramp', 'iter0', self.itermax)
+        self._cfl_itermax = cfg.getint('solver-cfl-ramp', 'max-iter', self.itermax)
+        self._cflmax = cfg.getfloat('solver-cfl-ramp', 'max-cfl', self._cfl0)
+        
+        # increment of cfl
+        if self._cfl_itermax > self._cfl_iter0:
+            self._dcfl = (self._cflmax - self._cfl0) / (self._cfl_itermax - self._cfl_iter0)
+        else:
+            self._dcfl = 0
 
         # Residual var
         ele = next(iter(self.sys.eles))
@@ -51,6 +62,15 @@ class BaseSteadyIntegrator(BaseIntegrator):
 
         # Construct stages
         self.construct_stages()
+
+    @property
+    def _cfl(self):
+        if self.iter < self._cfl_iter0:
+            return self._cfl0
+        elif self.iter > self._cfl_itermax:
+            return self._cflmax
+        else:
+            return self._cfl0 + self._dcfl*(self.iter - self._cfl_iter0)
 
     def complete_step(self, resid):
         self.resid = resid
