@@ -32,7 +32,7 @@ install_requires = [
     'h5py >= 2.6',
     'mpi4py >= 2.0',
     'numpy >= 1.10',
-    'numba >= 0.4'
+    'numba >= 0.5',
 ]
 
 # Scripts
