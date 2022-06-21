@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-
-
+# functions are originated from
+# https://github.com/PyFR/PyFR/blob/develop/pyfr/util.py
+# modified by jspark
+#
 def subclasses(cls, just_leaf=False):
     sc = cls.__subclasses__()
     ssc = [g for s in sc for g in subclasses(s, just_leaf)]

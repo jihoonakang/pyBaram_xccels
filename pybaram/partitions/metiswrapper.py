@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# Original code
+# https://github.com/PyFR/PyFR/blob/develop/pyfr/partitioners/metis.py
+# Modified by jspark
+# 
 from ctypes import POINTER, c_void_p, c_int, c_int, c_int64
 
 from pybaram.utils.ctypes import load_lib

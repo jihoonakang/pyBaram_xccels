@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# Original code
+# https://github.com/PyFR/PyFR/pull/96/commits/909b3195b28212806797750939e9252ee6ac34f5
+# modified by jspark
+#
 from ctypes import POINTER, create_string_buffer, c_char_p, c_int, c_void_p
 
 from pybaram.utils.ctypes import load_lib

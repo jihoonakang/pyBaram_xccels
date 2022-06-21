@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-
+# Original code
+# https://github.com/PyFR/PyFR/blob/develop/pyfr/readers/base.py
+# Modified by jspark
+# 
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from itertools import chain
@@ -236,7 +239,7 @@ class NodesAssembler(object):
 
             if pent == self._felespent:
                 elm['elm_{}_p0'.format(petype)] = ele
-            else:
+            elif pent in self._bfacespents:
                 bname = self._bfacespents[pent]
                 bnode[bname].append(np.unique(ele.ravel()))
 

@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# Original code
+# https://github.com/PyFR/PyFR/blob/develop/pyfr/readers/gmsh.py
+# Modified by jspark
+# 
 from collections import defaultdict
 import re
 

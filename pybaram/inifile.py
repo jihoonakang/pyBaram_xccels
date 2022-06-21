@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# Original code
+# https://github.com/PyFR/PyFR/blob/develop/pyfr/inifile.py
+# modified by jspark
+#
 from configparser import ConfigParser, NoOptionError, NoSectionError
 
 import io
