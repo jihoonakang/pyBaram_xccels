@@ -123,7 +123,7 @@ class BaseElements:
             self._ics[i] = ics[i]
 
     def set_ics_from_sol(self, sol):
-        self._ics = sol
+        self._ics = sol.astype(float)
 
     @property
     @fc.lru_cache()
