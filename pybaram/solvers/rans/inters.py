@@ -33,7 +33,7 @@ class RANSIntInters(BaseAdvecDiffIntInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
         compute_mu = self.ele0.mu_container()
         compute_mut = self.ele0.mut_container()
@@ -97,7 +97,7 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
         compute_mu = self.ele0.mu_container()
         compute_mut = self.ele0.mut_container()
@@ -210,7 +210,7 @@ class RANSBCInters(BaseAdvecDiffBCInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
         compute_mu = self.ele0.mu_container()
         compute_mut = self.ele0.mut_container()

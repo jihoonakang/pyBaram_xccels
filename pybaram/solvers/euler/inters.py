@@ -22,7 +22,7 @@ class EulerIntInters(BaseAdvecIntInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
 
         def comm_flux(i_begin, i_end, *uf):
@@ -61,7 +61,7 @@ class EulerMPIInters(BaseAdvecMPIInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
 
         def comm_flux(i_begin, i_end, rhs, *uf):
@@ -98,7 +98,7 @@ class EulerBCInters(BaseAdvecBCInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
 
         bc = self.bc

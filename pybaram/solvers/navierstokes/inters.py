@@ -23,7 +23,7 @@ class NavierStokesIntInters(BaseAdvecDiffIntInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
         compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
@@ -72,7 +72,7 @@ class NavierStokesMPIInters(BaseAdvecDiffMPIInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
         compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
@@ -121,7 +121,7 @@ class NavierStokesBCInters(BaseAdvecDiffBCInters):
             **self._const
         }
 
-        scheme = self.cfg.get('solver-interfaces', 'riemann-solver')
+        scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
         compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
