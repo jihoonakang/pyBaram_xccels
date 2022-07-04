@@ -18,7 +18,7 @@ def run(mesh, cfg, be='none', comm='none'):
         configuration file
     be : pyBaram backend object
         Backend to compute
-    comm : string
+    comm : mpi4py comm object
         Initiated MPI communicator
     """
     # Run common
@@ -39,7 +39,7 @@ def restart(mesh, soln, cfg, be='none', comm='none'):
         configuration file
     be : pyBaram backend object
         Backend to compute
-    comm : string
+    comm : mpi4py comm object
         Initiated MPI communicator
     """
     # Check mesh and solution file
