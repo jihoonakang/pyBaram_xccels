@@ -1,96 +1,35 @@
+# -*- coding: utf-8 -*-
 from argparse import ArgumentParser, FileType
-from mpi4py import MPI
 
+from pybaram.api.io import import_mesh, partition_mesh, export_soln
+from pybaram.api.simulation import run, restart
 from pybaram.inifile import INIFile
-from pybaram.backends import get_backend
-from pybaram.readers import get_reader
-from pybaram.partitions import get_partition
-from pybaram.integrators import get_integrator
-from pybaram.progressbar import Progressbar
 from pybaram.readers.native import NativeReader
-from pybaram.writers import get_writer
-
-import h5py
-import os
 
 
 def process_import(args):
-    extn = os.path.splitext(args.inmesh.name)[1]
-
-    # Get reader
-    reader = get_reader(extn, args.inmesh, args.scale)
-
-    # Get mesh in the pbm format
-    mesh = reader.to_pbm()
-
-    # Save to disk
-    with h5py.File(args.outmesh, 'w') as f:
-        for k, v in mesh.items():
-            f[k] = v
+    import_mesh(args.inmesh, args.outmesh, args.scale)
 
 
 def process_part(args):
-    # mesh
-    msh = NativeReader(args.mesh)
-
-    npart = int(args.npart)
-
-    get_partition(msh, args.out, npart)
-
-
-def process_common(msh, soln, cfg):
-    # MPI comm
-    comm = MPI.COMM_WORLD
-
-    # Get backend
-    backend = get_backend('cpu', cfg)
-
-    # Get integrator
-    integrator = get_integrator(backend, cfg, msh, soln, comm)
-
-    # Add progress bar
-    if comm.rank == 0:
-        if integrator.mode == 'unsteady':
-            pb = Progressbar(integrator.tlist[0], integrator.tlist[-1])
-
-            def callb(intg): return pb(intg.tcurr)
-        else:
-            pb = Progressbar(0, integrator.itermax, fmt="{:03d}")
-
-            def callb(intg): return pb(intg.iter+1)
-
-        integrator.completed_handler.append(callb)
-
-    integrator.run()
+    partition_mesh(args.mesh, args.out, args.npart)
 
 
 def process_export(args):
-    # Get writer
-    writer = get_writer(args.mesh, args.soln, args.out)
-
-    writer.write()
+    export_soln(args.mesh, args.soln, args.out)
 
 
 def process_run(args):
-    # Read mesh
-    msh = NativeReader(args.mesh)
-
-    # Configuration
+    mesh = NativeReader(args.mesh)
     cfg = INIFile(args.ini)
 
-    # Run common
-    process_common(msh, None, cfg)
+    run(mesh, cfg)
 
 
 def process_restart(args):
-    # Read mesh and soln
     mesh = NativeReader(args.mesh)
     soln = NativeReader(args.soln)
-
-    # Check mesh and solution file
-    if mesh['mesh_uuid'] != soln['mesh_uuid']:
-        raise RuntimeError('Solution is not computed by the mesh')
-
+    
     # Config file
     if args.ini:
         cfg = INIFile(args.ini)
@@ -98,8 +37,7 @@ def process_restart(args):
         cfg = INIFile()
         cfg.fromstr(soln['config'])
 
-    # Run common
-    process_common(mesh, soln, cfg)
+    restart(mesh, soln, cfg)
 
 
 def main():
@@ -111,8 +49,7 @@ def main():
 
     # Import command
     ap_import = sp.add_parser('import', help='import --help')
-    ap_import.add_argument('inmesh', type=FileType('r'),
-                           help='input mesh file')
+    ap_import.add_argument('inmesh', help='input mesh file')
     ap_import.add_argument('outmesh', help='output mesh file')
     ap_import.add_argument('-s', '--scale', type=float, default=1,
                            help='scale mesh')

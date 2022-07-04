@@ -113,7 +113,7 @@ class CGNSReader(BaseReader):
         self._cgns = cgns = CGNSWrapper()
 
         # Read CGNS mesh file
-        self._file = file = cgns.open(msh.name)
+        self._file = file = cgns.open(msh)
         base = cgns.base_read(file, 0)
 
         if cgns.nzones(base) > 1:

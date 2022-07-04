@@ -8,7 +8,8 @@ vfile = open('pybaram/_version.py').read()
 version = re.search(r'__version__\s+=\s+\'([\d.]+)\'', vfile).group(1)
 
 # Modules
-modules = ['pybaram.backends',
+modules = ['pybaram.api',
+           'pybaram.backends',
            'pybaram.backends.cpu',
            'pybaram.integrators',
            'pybaram.partitions',
