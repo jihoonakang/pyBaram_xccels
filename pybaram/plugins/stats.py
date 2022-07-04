@@ -12,7 +12,6 @@ class StatsPlugin(BasePlugin):
 
         sect = 'soln-plugin-{}'.format(self.name)
         self.flushsteps = cfg.getint(sect, 'flushsteps', 500)
-        self.itout = cfg.getint(sect, 'iter-out', 10)
 
         self._rank = rank = MPI.COMM_WORLD.rank
         if rank == 0:

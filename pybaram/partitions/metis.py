@@ -52,7 +52,8 @@ class METISPartition:
         # Define nmap
         for rank in range(npart):
             nmap = newmesh['nmap_p{}'.format(rank)] = np.unique(
-                np.concatenate(np.array(elms)[epart == rank])).astype('i4')
+                np.concatenate([elm for elm, ep in zip(elms, epart) if ep == rank])
+            ).astype('i4')
             newmesh['node_p{}'.format(rank)] = nodes[nmap - 1]
 
         # Global address
