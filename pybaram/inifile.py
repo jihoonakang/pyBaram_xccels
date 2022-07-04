@@ -8,6 +8,8 @@ from configparser import ConfigParser, NoOptionError, NoSectionError
 import io
 import re
 
+from numpy import isin
+
 
 class INIFile:
     def __init__(self, file=None):
@@ -65,4 +67,9 @@ class INIFile:
         return buf.getvalue()
 
     def fromstr(self, str):
+        # h5py compatability 
+        # Older version (2.X) gives string but new one (3.X) gives bytes
+        if isinstance(str, bytes):
+            str = str.decode('utf-8')
+
         self._cfg.read_string(str)

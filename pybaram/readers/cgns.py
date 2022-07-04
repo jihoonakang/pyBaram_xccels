@@ -75,7 +75,7 @@ class CGNSZoneReader(object):
         s = self._cgns.section_read(zone, idx)
 
         elerng = s['range']
-        conn = np.zeros(s['dim'], dtype=np.int32)
+        conn = np.zeros(s['dim'], dtype=self._cgns.int_np)
         self._cgns.elements_read(s, conn)
 
         cgns_type = s['etype']
