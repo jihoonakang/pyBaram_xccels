@@ -1,0 +1,15 @@
+name: pybaram
+
+channels:
+ - conda-forge
+ - defaults
+
+dependencies:
+  - python>=3.8
+  - numpy
+  - numba
+  - h5py
+  - mpi4py
+  - sphinx
+  - numpydoc
+  - sphinx_rtd_theme

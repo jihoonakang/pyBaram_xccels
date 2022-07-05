@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from mpi4py import MPI
-
 from pybaram.backends import get_backend
 from pybaram.integrators import get_integrator
 from pybaram.progressbar import Progressbar
@@ -52,6 +50,8 @@ def restart(mesh, soln, cfg, be='none', comm='none'):
 
 def _common(msh, soln, cfg, backend, comm):
     if comm == 'none':
+        from mpi4py import MPI
+        
         # MPI comm
         comm = MPI.COMM_WORLD
 

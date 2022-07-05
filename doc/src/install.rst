@@ -38,7 +38,7 @@ With `Anaconda <https://www.anaconda.com/>`_ (or `Miniconda <https://docs.conda.
 
 3. Obtain ``pyBaram`` release version from `release page <https://gitlab.com/i3388/PyBaram/-/releases>`_ and install it::
 
-    user@Compuer ~/pyBaram$ pip install pybaram-0.2.1-py3-none-any.whl
+    user@Compuer ~/pyBaram$ pip install pybaram-0.2.2-py3-none-any.whl
 
 
 Compile from source
