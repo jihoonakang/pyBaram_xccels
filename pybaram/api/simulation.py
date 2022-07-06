@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from pybaram.backends import get_backend
 from pybaram.integrators import get_integrator
-from pybaram.progressbar import Progressbar
+
+from tqdm import tqdm
 
 
 def run(mesh, cfg, be='none', comm='none'):
@@ -65,13 +66,15 @@ def _common(msh, soln, cfg, backend, comm):
     # Add progress bar
     if comm.rank == 0:
         if integrator.mode == 'unsteady':
-            pb = Progressbar(integrator.tlist[0], integrator.tlist[-1])
+            pb = tqdm(
+                total=integrator.tlist[-1], initial=integrator.tcurr,
+                unit_scale=True)
 
-            def callb(intg): return pb(intg.tcurr)
+            def callb(intg): return pb.update(intg.dt)
         else:
-            pb = Progressbar(0, integrator.itermax, fmt="{:03d}")
+            pb = tqdm(total=integrator.itermax, initial=integrator.iter)
 
-            def callb(intg): return pb(intg.iter+1)
+            def callb(intg): return pb.update(1)
 
         integrator.completed_handler.append(callb)
 

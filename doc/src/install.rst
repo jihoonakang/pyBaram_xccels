@@ -57,6 +57,7 @@ pyBaram |version| requires python 3.7+ and following python packages.
 2. `numba` >= 0.5
 3. `h5py` >= 2.6
 4. `mpi4py` >= 2.0
+5. `tqdm` >= 4.0
 
 In order to convert the mesh with CGNS format, CGNS library is required.
 

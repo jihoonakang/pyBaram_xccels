@@ -34,6 +34,7 @@ install_requires = [
     'mpi4py >= 2.0',
     'numpy >= 1.10',
     'numba >= 0.5',
+    'tqdm >= 4.0',
 ]
 
 # Scripts
