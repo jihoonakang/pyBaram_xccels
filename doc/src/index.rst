@@ -13,6 +13,7 @@ Welcome to pyBaram's documentation!
    install
    user_guide
    examples
+   theory
 
 Indices and tables
 ==================
