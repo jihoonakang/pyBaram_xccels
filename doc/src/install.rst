@@ -19,7 +19,7 @@ using the high performance Python packages.
 Installation
 *************
 
-pyBaram |version| can be obtained from the `repository <https://gitlab.com/i3388/PyBaram>`_.
+pyBaram |version| can be obtained from the `repository <https://gitlab.com/aadl_inha/PyBaram>`_.
 Currently, ``pyBaram`` supports only Linux system or WSL (Windows Subsystem Linux).
 
 Quick start
@@ -36,7 +36,7 @@ With `Anaconda <https://www.anaconda.com/>`_ (or `Miniconda <https://docs.conda.
     user@Compuer ~/pyBaram$ conda install numpy numba h5py metis
     user@Compuer ~/pyBaram$ conda install -c conda-forge mpi4py cgns
 
-3. Obtain ``pyBaram`` release version from `release page <https://gitlab.com/i3388/PyBaram/-/releases>`_ and install it::
+3. Obtain ``pyBaram`` release version from `release page <https://gitlab.com/aadl_inha/PyBaram/-/releases>`_ and install it::
 
     user@Compuer ~/pyBaram$ pip install pybaram-0.2.2-py3-none-any.whl
 
