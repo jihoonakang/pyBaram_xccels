@@ -92,7 +92,7 @@ Parameterize cpu backend with
 
 1. multi-thread --- for selecting the multi-threading layer. This parameter passes to ``Numba``.
 
-    ``single`` | ``parallel`` | ``omp`` | ``tbb`` | 
+    ``single`` | ``parallel`` | ``omp`` | ``tbb`` 
 
     where
 

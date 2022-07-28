@@ -5,7 +5,7 @@ image: continuumio/miniconda3
 
 before_script:
   - apt-get update -q -y
-  - apt-get install -y build-essential
+  - apt-get install -y build-essential texlive-latex-extra dvipng
   - conda env create -f .environment.yml
   - conda init bash
   - source ~/.bashrc
