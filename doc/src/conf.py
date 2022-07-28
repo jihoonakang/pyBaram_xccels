@@ -37,6 +37,7 @@ extensions = [
     'sphinx.ext.imgmath',
     'sphinx.ext.viewcode',
     'sphinx.ext.imgmath',
+    'sphinxcontrib.bibtex',
     'numpydoc',
 ]
 
@@ -80,4 +81,9 @@ latex_documents = [
   ('index', 'pyBaram.tex', u'pyBaram Documentation',
    u'Inha University', 'manual'),
 ]
+
+# -- Options for Bibliography output --------------------------------------------
+
+bibtex_bibfiles = ['references.bib']
+bibtex_default_style = 'unsrt'
 
