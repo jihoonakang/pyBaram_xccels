@@ -13,6 +13,10 @@ Examples of using pyBaram are available in the examples directory. Currently ava
 
 - 2D transonic turbulent flow over RAE2822 airfoil
 
+Documentation
+-------------
+Information on install, usage and implementation of pyBaram can be found in the [documentation](https://aadl_inha.gitlab.io/pyBaram/).
+
 Authors
 --------
 Jin Seok Park <jinseok.park@inha.ac.kr>
