@@ -72,14 +72,14 @@ Mesh File
 Currently, only single unstructured zone can be solved.
 The volume and face should be properly labelled. 
 The volume label of single zone should be `fluid` and 
-faces for boundary condition should have distinct label.
+faces for boundary condition should have distinct labels.
 
 
 Configuration File
 ==================
-The parameters for ``pyBaram`` simulations are given in the configuration file.
+The parameters for ``pyBaram`` simulation are given in the configuration file.
 This file is written in INI file format and ``configparser`` module parses it.
-Followings describes the sections and details of parameters.
+Followings describe the sections and details of parameters.
 
 Backends
 ---------
@@ -114,7 +114,7 @@ Examples::
 
 Constants
 ---------
-In the constants section, essential and user-defined constants are defined. 
+In the constants section, essential and user-defined constants are configured. 
 Some constants can be expressed as a function of other constants.
 Followings are the essential constant depending on the equation to solve.
 
@@ -157,7 +157,7 @@ In following sections, numerical schemes are configured.
 
 [solver]
 ********
-Type of equations and spatial schemes are configured as follows.
+Type of equations and spatial discretization schemes are configured as follows.
 
 1. system --- type of equations. 
 
@@ -169,7 +169,7 @@ Type of equations and spatial schemes are configured as follows.
 
         * ``rans-kwsst`` --- two-equation :math:`k\omega`-SST model
 
-2. order --- spatial order of accuracy
+2. order --- spatial order of accuracy.
 
     ``1`` | ``2``
 
@@ -204,7 +204,7 @@ Example::
 ************************
 Time integration (or relaxation) schemes and related parameters are configured.
 
-1. mode --- steady of unsteady computation. Currently, dual-time stepping approach is not supported.
+1. mode --- steady or unsteady computation. Currently, dual-time stepping approach is not supported.
 
     ``steady`` | ``unsteady``
 
@@ -272,14 +272,14 @@ Example for steady simulation::
 
 [solver-cfl-ramp]
 *****************
-If this section is configured, CFL number can be rampping linearly. 
-Intially CFL number starts from the assigned ``cfl`` in ``[solver-time-integrator]``.
+If this section is configured, CFL number can be ramped up linearly. 
+Initially CFL number starts from the assigned ``cfl`` in ``[solver-time-integrator]``.
 
 1. ``iter0`` --- iteration until maintaining the initial CFL.
 
     `int`
 
-2. ``max-iter`` --- final iteration to finish ramping CFL.
+2. ``max-iter`` --- final iteration to finish CFL ramping.
 
     `int`
 
@@ -302,7 +302,7 @@ thus it is recommended to assign scaled variables
 as initial and boundary conditions, as shown in following examples.
 The position variables (`x`, `y`, `z`) and 
 few numerical functions (:math:`\sin, \cos, \tanh, \exp, \sqrt {}`)
-and constants (:math:`\pi`) can be used.
+and constant (:math:`\pi`) can be used.
 
 [soln-ics]
 **********
@@ -336,7 +336,7 @@ The label should be same as the mesh file (``.pbrm``).
 
      ``slip-wall`` | ``adia-wall`` | ``isotherm-wall`` | ``sup-out`` | ``sup-in`` | ``sub-outp`` | ``sub-inv`` |  ``far`` 
 
-The details of type and required variables is summarized as follows.
+The details of type and required variables are summarized as follows.
 
 * ``slip-wall`` --- slip wall boundary condition. 
 
@@ -483,8 +483,8 @@ This plugin gives both integrated values and averaged values
 
     `strings`
 
-4. `item` --- expression of `item`. As well as reserved variables for initial and boundary conditions
-   and primitive variables, `nx`, `ny`, `nz`, which denote the component normal vector, can be used to express item.
+4. `item` --- expression of `item`. As well as reserved variables for initial and boundary conditions,
+   `nx`, `ny`, `nz`, which denote the component normal vector, can be used to express item.
 
 Examples::
 

@@ -13,14 +13,9 @@ def import_mesh(inmesh, outmesh, scale=1.0):
     """
     Import genreated mesh to pyBaram.
 
-    Parameters
-    ----------
-    inmesh : string
-        Original mesh from generator (CGNS, Gmsh)
-    outmesh : string
-        Converted pyBaram mesh (.pbrm)
-    scale : float
-        Geometric scale factor 
+    :param string inmesh: Original mesh from generator (CGNS, Gmsh)
+    :param string outmesh: Converted pyBaram mesh (.pbrm)
+    :param float scale: Geometric scale factor 
     """
     # Split ext
     extn = os.path.splitext(inmesh)[1]
@@ -41,14 +36,9 @@ def partition_mesh(inmesh, outmesh, npart):
     """
     Paritioning pyBarm mesh
 
-    Parameters
-    ----------
-    inmesh : string
-        path and name of unspliited pyBaram mesh
-    outmesh : string
-        path and name of patitioned mesh
-    npart : int
-        number of partition
+    :param string inmesh: path and name of unspliited pyBaram mesh
+    :param string outmesh: path and name of patitioned mesh
+    :param int npart: number of partition
     """
 
     # mesh
@@ -63,14 +53,9 @@ def export_soln(mesh, soln, out):
     """
     Export solution to visualization file
 
-    Parameters
-    ----------
-    mesh : string
-        pyBaram mesh file
-    soln : string
-        pyBaram solution file
-    out : string
-        exported file for visualization
+    :param string mesh: pyBaram mesh file
+    :param string soln: pyBaram solution file
+    :param string out: exported file for visualization
     """
     # Get writer
     writer = get_writer(mesh, soln, out)

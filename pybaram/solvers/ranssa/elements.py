@@ -51,6 +51,7 @@ class RANSSAFluidElements(ViscousFluidElements):
         ndims, nvars = self.ndims, self.nvars
 
         def tflux(u, nf, f):
+            # Convective flux for turbulent variables
             rho = u[0]
             contrav = dot(u, nf, ndims, 1)/rho
 
@@ -118,12 +119,12 @@ class RANSSAFluidElements(ViscousFluidElements):
         return self.be.compile(src)
 
     def fix_nonPys_container(self):
+        # Constants and dimensions
         gamma, pmin = self._const['gamma'], self._const['pmin']
         ndims, nfvars, nvars = self.ndims, self.nfvars, self.nvars
 
-        # Adhoc
-
         def fix_nonPhy(u):
+            # Fix non-physical solution (negative density, pressure)
             rho, et = u[0], u[nfvars-1]
             if rho < 0:
                 u[0] = rho = eps
@@ -133,6 +134,7 @@ class RANSSAFluidElements(ViscousFluidElements):
             if p < pmin:
                 u[nfvars - 1] = pmin/(gamma-1) + 0.5*dot(u, u, ndims, 1, 1)/rho
             
+            # Prevent negative turbulent variable
             u[nvars-1] = max(eps, u[nvars-1])
             #if u[nvars-1] < 10*eps:
             #    u[nvars-1] = 10*eps
@@ -161,12 +163,13 @@ class RANSSAElements(RANSElements, RANSSAFluidElements):
         self._turb_coeffs = cfg.items(sect)
     
     def _make_post(self):
+        # Get post-process function
         _fix_nonPys = self.fix_nonPys_container()
         _compute_mu = self.mu_container()
         _compute_mut = self.mut_container()
 
         def post(i_begin, i_end, upts, grad, mu, mut):
-            # Update
+            # Apply the function over eleemnts
             for idx in range(i_begin, i_end):
                 _fix_nonPys(upts[:, idx])
                 mu[idx] = _compute_mu(upts[:, idx])
@@ -175,6 +178,7 @@ class RANSSAElements(RANSElements, RANSSAFluidElements):
         return self.be.make_loop(self.neles, post)   
 
     def make_turb_wave_speed(self):
+        # Dimensions and constants
         ndims, nvars = self.ndims, self.nvars
         sigma = self._turb_coeffs['sigma']
 
@@ -185,6 +189,7 @@ class RANSSAElements(RANSElements, RANSSAFluidElements):
             nu = mu[idx]/rho
             nut = u[nvars-1]
 
+            # Wave speed : abs(Vn) + 1/dx/sigma*(nu+nut)
             return abs(contra) + 1/dx*(nu + nut)/sigma
 
         return self.be.compile(_lambdaf)

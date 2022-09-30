@@ -14,6 +14,7 @@ class RANSIntInters(BaseAdvecDiffIntInters):
         ydistf = [cell.ydist for cell in elemap.values()]
         self.ydist = np.array([ydistf[t][e]  for (t, e, _) in self._lidx.T])
         
+        # Call Parent method
         super().construct_kernels(elemap)
 
     def _make_flux(self):
@@ -24,7 +25,7 @@ class RANSIntInters(BaseAdvecDiffIntInters):
         nf, sf = self._vec_snorm, self._mag_snorm
         ydist = self.ydist
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -33,40 +34,54 @@ class RANSIntInters(BaseAdvecDiffIntInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+
+        # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
         compute_mut = self.ele0.mut_container()
         visflux = make_visflux(self.be, cplargs)
+
+        # Get turbulence flux from `turbulent.py`
         tflux = self._make_turb_flux()
 
         def comm_flux(i_begin, i_end, gradf, *uf):
+            # Hoist allocation
             um = np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
                 ydnsi = ydist[idx]
 
+                # Left and right solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 rti, rfi, rei = rt[idx], rf[idx], re[idx]
                 ul = uf[lti][lfi, :, lei]
                 ur = uf[rti][rfi, :, rei]
+
+                # Gradient and solution at face
                 gf = gradf[:, :, idx]
 
                 for jdx in range(nvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
                 
+                # Compute viscosity and viscous flux
                 mu = compute_mu(um)
                 mut = compute_mut(um, gf, mu, ydnsi)
                 visflux(um, gf, nfi, mu, mut, fn)
 
+                # Compute turbulent flux
                 tflux(ul, ur, um, gf, nfi, ydnsi, mu, mut, fn)
 
                 for jdx in range(nvars):
+                    # Save it at left and right solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
                     uf[rti][rfi, jdx, rei] = -fn[jdx]*sf[idx]
 
@@ -79,6 +94,7 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
         ydistf = [cell.ydist for cell in elemap.values()]
         self.ydist = np.array([ydistf[t][e]  for (t, e, _) in self._lidx.T])
         
+        # Call Parent method
         super().construct_kernels(elemap)
 
     def _make_flux(self):
@@ -88,7 +104,7 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
         nf, sf = self._vec_snorm, self._mag_snorm
         ydist = self.ydist
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -97,39 +113,53 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+
+        # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
         compute_mut = self.ele0.mut_container()
         visflux = make_visflux(self.be, cplargs)
+
+        # Get turbulence flux from `turbulent.py`
         tflux = self._make_turb_flux()
 
         def comm_flux(i_begin, i_end, gradf, rhs, *uf):
+            # Hoist allocation
             um = np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
                 ydnsi = ydist[idx]
 
+                # Left and right solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 ul = uf[lti][lfi, :, lei]
                 ur = rhs[:, idx]
+
+                # Gradient and solution at face
                 gf = gradf[:, :, idx]
 
                 for jdx in range(nvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
                 
+                # Compute viscosity and viscous flux
                 mu = compute_mu(um)
                 mut = compute_mut(um, gf, mu, ydnsi)
                 visflux(um, gf, nfi, mu, mut, fn)
 
+                # Compute turbulent flux
                 tflux(ul, ur, um, gf, nfi, ydnsi, mu, mut, fn)
 
                 for jdx in range(nvars):
+                    # Save it at left solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)
@@ -139,10 +169,10 @@ class RANSBCInters(BaseAdvecDiffBCInters):
     is_vis_wall = False
 
     def construct_bc(self):
-        # BC 함수
+        # Parse BC function name
         bcf = re.sub('-', '_', self.name)
 
-        # BC constant
+        # Constants for BC function
         if self._reqs:
             bcsect = 'soln-bcs-{}'.format(self.bctype)
             bcc = {k: npeval(self.cfg.getexpr(bcsect, k, self._const))
@@ -155,6 +185,7 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         bcc.update(self._const)
         bcc.update(self._turb_coeffs)
 
+        # Get bc from `bcs.py` (in rans...) and compile them
         self.bc = self._get_bc(self.be, bcf, bcc)
 
     def construct_kernels(self, elemap):
@@ -162,6 +193,7 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         ydistf = [cell.ydist for cell in elemap.values()]
         self.ydist = np.array([ydistf[t][e]  for (t, e, _) in self._lidx.T])
         
+        # Call Parent method
         super().construct_kernels(elemap)
 
     def _make_delu(self):
@@ -201,7 +233,7 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         nf, sf = self._vec_snorm, self._mag_snorm
         ydist = self.ydist
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -210,43 +242,62 @@ class RANSBCInters(BaseAdvecDiffBCInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+
+        # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
         compute_mut = self.ele0.mut_container()
         visflux = make_visflux(self.be, cplargs)
+
+        # Get turbulence flux from `turbulent.py`
         tflux = self._make_turb_flux()
 
+        # Get bc function (`self.bc` was defined at `baseadvec.inters`)
         bc = self.bc
 
         def comm_flux(i_begin, i_end, gradf, *uf):
+            # Hoist allocation
             ur, um = np.empty(nvars), np.empty(nvars)
             ftmp = pre()
             fn = np.empty(nvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
                 ydnsi = ydist[idx]
 
+                # Left solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 ul = uf[lti][lfi, :, lei]
+
+                # Gradient at face
                 gf = gradf[:, :, idx]
 
+                # Viscosity from left solution
                 mul = compute_mu(ul)
 
+                # Compute BC
                 bc(ul, ur, nfi, mul, ydnsi)
+
+                # Solution at face
                 for jdx in range(nvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
                 
+                # Compute viscosity and viscous flux
                 mu = compute_mu(um)
                 mut = compute_mut(um, gf, mu, ydnsi)
                 visflux(um, gf, nfi, mu, mut, fn)
 
+                # Compute turbulent flux
                 tflux(ul, ur, um, gf, nfi, ydnsi, mu, mut, fn)
 
                 for jdx in range(nvars):
+                    # Save it at left solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)

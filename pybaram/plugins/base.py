@@ -3,6 +3,7 @@ import os
 
 
 def csv_write(fname, header):
+    # Write data as CSV file
     outf = open(fname, 'a')
 
     if os.path.getsize(fname) == 0:
@@ -12,4 +13,5 @@ def csv_write(fname, header):
 
 
 class BasePlugin:
+    # Abstract class of Plugin
     name = None

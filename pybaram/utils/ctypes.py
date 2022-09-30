@@ -20,6 +20,7 @@ def platform_dirs():
 
 
 def load_lib(name):
+    # Load library via ctypes
     libname = platform_libname(name)
 
     try:

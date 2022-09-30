@@ -71,10 +71,10 @@ This is famous benchmark to solve transonic flow over three-dimensional wing.
 The detail flow conditions can be obtained from `NASA Turbulence Modeling Resource <https://turbmodels.larc.nasa.gov/onerawingnumerics_val.html>`_.
 The mesh file is generated using the provided code from the same webpage and series of mixed mesh could be generated.
 You can download medium and fine mesh files from the link in examples folder.
-Since the provided mesh files are quite big, it is recommended to run this case on the cluster machine.
+Since the provided mesh files are quite huge, it is recommended to run this case on the cluster machine.
 Procedures to obtain steady-state solution are presented as follows.
 
-1. Convert mesh:
+1. Convert mesh::
 
     user@Compuer ~/pyBaram$ pybaram import wing_mixed_ph.3.cgns wing_mixed_ph.3.pbrm
 
@@ -106,10 +106,10 @@ Supersonic flow over HB-2 model
 The HB-2 model is a standard test case of axisymmetric body.
 The detail flow conditions and experimental data can be obtained from `AEDC technical report <https://apps.dtic.mil/sti/pdfs/AD0412651.pdf>`_.
 You can download the mesh file from the link in examples folder.
-Since the provided mesh file is quite big, it is recommended to run this case on the cluster machine.
+Since the provided mesh file is quite huge, it is recommended to run this case on the cluster machine.
 Procedures to obtain steady-state solution are presented as follows.
 
-1. Convert mesh:
+1. Convert mesh::
 
     user@Compuer ~/pyBaram$ pybaram import hb2.cgns hb2.pbrm
 

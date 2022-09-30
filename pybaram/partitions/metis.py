@@ -15,16 +15,20 @@ class METISPartition:
         # TODO: merge mesh
         # TODO: partitioning solution
 
+        # Partitioning elements and mapping
         newm, eidx_g2l = self.partition_mesh(msh, npart)
 
+        # Update elements, connectivities, vertex and nodes
         newm.update(self.partition_elm(msh, eidx_g2l))
         newm.update(self.partition_cons(msh, eidx_g2l))
         newm.update(self.partition_bcons(msh, eidx_g2l))
         newm.update(self.partition_vtx(msh, eidx_g2l))
         self.copy_bnode(msh, newm)
 
+        # Assign new UUID
         newm['mesh_uuid'] = np.array(str(uuid.uuid4()), dtype='S')
 
+        # Save new mesh
         with h5py.File(out, 'w') as f:
             for k, v in newm.items():
                 f[k] = v
@@ -85,7 +89,7 @@ class METISPartition:
 
         ncommon = 2
 
-        # Partitioning
+        # Partitioning with METIS
         ne = sum([nele[t] for t in etypes])
         nn = eind.max() + 1
 
@@ -99,6 +103,7 @@ class METISPartition:
             n.split('_')[1]: msh[n] for n in msh if n.startswith('elm')
         }
 
+        # Sort elements per rank
         newelm = defaultdict(list)
         for (t, g), (p, l) in eidx_g2l.items():
             ele = elms[t][g]
@@ -116,9 +121,11 @@ class METISPartition:
             pr, rel = eidx_g2l[(rt, re)]
 
             if pl == pr:
+                # Save internal connectivity
                 cons['con_p{}'.format(pl)].append(
                     [(lt, lel, lf, lz), (rt, rel, rf, rz)])
             else:
+                # Save parallel connectivity
                 cons['con_p{}p{}'.format(pl, pr)].append((lt, lel, lf, lz))
                 cons['con_p{}p{}'.format(pr, pl)].append((rt, rel, rf, rz))
 
@@ -135,6 +142,7 @@ class METISPartition:
                 for (t, e, f, z) in bc:
                     p, el = eidx_g2l[(t, e)]
 
+                    # Save boundary connectivity per rank
                     bcons['bcon_{}_p{}'.format(bctype, p)].append(
                         (t, el, f, z))
 

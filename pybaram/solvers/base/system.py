@@ -14,6 +14,7 @@ def get_spts(nodepts, etype, cell):
 
     ndim = _etype_ndim[etype]
 
+    # Get nodes and sort them
     arr = np.array([[nodepts[i] for i in nn] for nn in cell])
     arr = arr.swapaxes(0, 1)
     return arr[..., :ndim]
@@ -87,6 +88,7 @@ class BaseSystem:
                 vmap = dict(zip(nmap, np.arange(len(nmap))))
                 vcon = np.array([[vmap[i] for i in e] for e in cons])
 
+                # Load elements
                 ele = self._elements_cls(be, cfg, etype, spts, vcon)
                 elemap[etype] = ele
                 eles.append(ele)

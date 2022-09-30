@@ -14,6 +14,7 @@ class BaseAdvecVertex(BaseVertex):
             self.vpts = None
         else:
             if not hasattr(self, 'vpts'):
+                # Allocate array to compute extremes at vertex
                 self.vpts = np.empty((2, self.nvars, self.nvtx))
 
         return self.vpts
@@ -23,12 +24,12 @@ class BaseAdvecVertex(BaseVertex):
         limiter = self.cfg.get('solver', 'limiter', 'none')
 
         if order > 1 and limiter != 'none':
-            # 꼭지점에서 최대/최소값 계산
+            # Kernel to compute exterems at vertex
             upts_in = [ele.upts_in for ele in elemap.values()]
             self.compute_extv = Kernel(self._make_extv(), self.vpts, *upts_in)
 
             if self._neivtx:
-                # MPI 병렬시 꼭지점 값 통신 Kernel
+                # Construct kernels for MPI communication at vertex
                 self.mpi = True
                 self._construct_neighbors(self._neivtx)
             else:
@@ -51,6 +52,7 @@ class BaseAdvecVertex(BaseVertex):
                             vext[0, jdx, i] = upts[ti][jdx, ei]
                             vext[1, jdx, i] = upts[ti][jdx, ei]
                         else:
+                            # Compute max / min solution at vertex
                             vext[0, jdx, i] = max(
                                 vext[0, jdx, i], upts[ti][jdx, ei])
                             vext[1, jdx, i] = min(
@@ -82,14 +84,17 @@ class BaseAdvecVertex(BaseVertex):
 
         def _communicate(reqs):
             def runall(q):
+                # Start all MPI
                 q.register(*reqs)
                 MPI.Prequest.Startall(reqs)
 
             return runall
 
+        # Start Sreqs (requsts for Send) and Rreqs (Request for Receive)
         self.send = _communicate(sreqs)
         self.recv = _communicate(rreqs)
 
+        # Pack and unpack vertex value before and after communication
         self.pack = lambda: [pack(self.vpts, buf)
                              for pack, buf in zip(packs, sbufs)]
         self.unpack = lambda: [unpack(self.vpts, buf)
@@ -104,6 +109,7 @@ class BaseAdvecVertex(BaseVertex):
             for idx in range(i_begin, i_end):
                 iv = ivtx[idx]
                 for jdx in range(nvars):
+                    # Save extremes to buffer
                     buf[0, jdx, idx] = vext[0, jdx, iv]
                     buf[1, jdx, idx] = vext[1, jdx, iv]
 
@@ -116,6 +122,7 @@ class BaseAdvecVertex(BaseVertex):
             for idx in range(i_begin, i_end):
                 iv = ivtx[idx]
                 for jdx in range(nvars):
+                    # Update extremes with exchanged values
                     vext[0, jdx, iv] = max(vext[0, jdx, iv], buf[0, jdx, idx])
                     vext[1, jdx, iv] = min(vext[1, jdx, iv], buf[1, jdx, idx])
 

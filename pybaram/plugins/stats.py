@@ -13,12 +13,14 @@ class StatsPlugin(BasePlugin):
         sect = 'soln-plugin-{}'.format(self.name)
         self.flushsteps = cfg.getint(sect, 'flushsteps', 500)
 
+        # Get rank
         self._rank = rank = MPI.COMM_WORLD.rank
         if rank == 0:
             # Out file name and header
             fname = "stats.csv"
             header = ['iter']
 
+            # Make header
             if intg.mode == 'steady':
                 ele = next(iter(intg.sys.eles))
                 conservars = ele.conservars
@@ -30,6 +32,7 @@ class StatsPlugin(BasePlugin):
 
     def __call__(self, intg):
         if self._rank == 0:
+            # Collect stats at this iteration
             stats = [intg.iter]
 
             if intg.mode == 'steady':
@@ -40,5 +43,6 @@ class StatsPlugin(BasePlugin):
 
             print(','.join(str(r) for r in stats), file=self.outf)
 
+            # Check if stats are flushed or not or not at this iteration
             if intg.iter % self.flushsteps == 0:
                 self.outf.flush()

@@ -21,34 +21,40 @@ class RANSElements(BaseAdvecDiffElements):
         nauxvars = len(self.auxvars)
         self.aux = aux = np.empty((nauxvars, self.neles))
 
-        # 벽면까지 길이 계산
+        # Compute wall distance
         self.ydist = aux[0]
         self._wall_distance(xw, self.ydist)
 
+        # Call paraent method
         super().construct_kernels(vertex, nreg)
 
         # Viscosity
         self.mu, self.mut = aux[1], aux[2]
 
-        # Kernel argument 조절 및 Aux variable 초기화
+        # Update arguments of post kerenl
         self.post.update_args(self.upts_in, self.grad, self.mu, self.mut)
+        
+        # Initialize viscosity
         self.post()
 
+        # Update arguments of divergence kernel
         self.div_upts.update_args(
             self.upts_out, self.fpts, self.upts_in, self.grad,
             self.dsrc, self.mu, self.mut
         )
 
-        # Timestep Kernel argument 조절
+        # Kernel to compute timestep
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.mu, self.mut, self.dt)
 
     def _wall_distance(self, xw, wdist):
-        # _wdist 함수 상수
+        # Dimensions and constants
         nf, ne, nd = self.eles.shape
         nw = xw.shape[0]
         eles = self.eles
         rcp_nf = 1.0 / nf
+
+        # Guess maximum distance
         xmax = 2*(eles.max() - eles.min())
 
         def _cal_wdist(i_begin, i_end, wdist):
@@ -64,7 +70,7 @@ class RANSElements(BaseAdvecDiffElements):
                     for kdx in range(nw):
                         xwi = xw[kdx]                      
                         
-                        # 길이 계산
+                        # Compute distance
                         dx = 0
                         for i in range(nd):
                             dx += (xwi[i] - xc[i])**2
@@ -81,6 +87,7 @@ class RANSElements(BaseAdvecDiffElements):
         self.be.make_loop(ne, _cal_wdist)(wdist)
 
     def make_wave_speed(self):
+        # Dimensions and constants
         ndims, nfvars = self.ndims, self.nfvars
         gamma, pmin = self._const['gamma'], self._const['pmin']
         pr, prt = self._const['pr'], self._const['prt']
@@ -92,15 +99,21 @@ class RANSElements(BaseAdvecDiffElements):
             p = max((gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho), pmin)
             c = np.sqrt(gamma*p/rho)
 
+            # Wave speed abs(Vn) + c + 1/dx/rho * max(4/3 \gamma) (mu/pr + mut/prt)
             return abs(contra) + c + 1/dx/rho * max(4/3, gamma)*(mu[idx]/pr + mut[idx]/prt)
 
         return self.be.compile(_lambdaf)
 
     def _make_timestep(self):
+        # Dimensions
         ndims, nface = self.ndims, self.nface
         nflvars = self.nfvars
+
+        # Static variables
         vol = self._vol
         smag, svec = self._gen_snorm_fpts()
+
+        # Constants
         gamma, pmin = self._const['gamma'], self._const['pmin']
         pr, prt = self._const['pr'], self._const['prt']
 
@@ -113,13 +126,16 @@ class RANSElements(BaseAdvecDiffElements):
                 p = max((gamma - 1)*(et - 0.5*rv2), pmin)
                 c = np.sqrt(gamma*p/rho)
 
+                # Sum of Wave speed * surface area
                 sum_lamdf = 0.0
                 for jdx in range(nface):
+                    # Wave speed abs(Vn) + c + max(4/3 \gamma)/rho/(mu/pr+mut/prt)/length
                     lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1)) + c
                     lamdf += (1/rho*max(4/3, gamma)*(mu[idx]/pr + mut[idx]/prt)*
                               smag[jdx, idx]/vol[idx])
                     sum_lamdf += lamdf*smag[jdx, idx]
 
+                # Time step : CFL * vol / sum(lambda_f S_f)
                 dt[idx] = cfl*vol[idx] / sum_lamdf
 
         return self.be.make_loop(self.neles, timestep)
@@ -138,7 +154,7 @@ class RANSElements(BaseAdvecDiffElements):
                             tmp += op[k, j, i]*grad[j, l, i]
                         fpts[k, l, i] = upts[l, i] + lim[l, i]*tmp
 
-                # First order
+                # First order reconstruction for turbulent variables
                 for l in range(nfvars, nvars):
                     for k in range(nface):
                         fpts[k, l, i] = upts[l, i]
@@ -170,6 +186,7 @@ class RANSElements(BaseAdvecDiffElements):
         return self.be.make_loop(self.neles, _div_upts)
 
     def _make_post(self):
+        # Get post-process function
         _fix_nonPys = self.fix_nonPys_container()
         _compute_mu = self.mu_container()
         _compute_mut = self.mut_container()
@@ -178,13 +195,15 @@ class RANSElements(BaseAdvecDiffElements):
         muf = self._const['mu']
 
         def post(i_begin, i_end, upts, grad, mu, mut):
-            # Update
+            # Apply the function over eleemnts
             for idx in range(i_begin, i_end):
                 _fix_nonPys(upts[:, idx])
                 mu[idx] = _compute_mu(upts[:, idx])
                 mut[idx] = _compute_mut(
                     upts[:, idx], grad[:,:,idx], mu[idx], ydist[idx]
                 )
+
+                # Limit for turbulence viscosity
                 mut[idx] = min(mut[idx], 100000*muf)
 
         return self.be.make_loop(self.neles, post)

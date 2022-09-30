@@ -17,6 +17,7 @@ class ViscousFluidElements(FluidElements):
     def mu_container(self):
         mu = self._const['mu']
 
+        # TODO: Sutherland Law
         # Constant viscosity
         def compute_mu(*args):
             return mu
@@ -30,11 +31,12 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         self.nvars = len(self.primevars)
         self.nfvars = self.nvars
 
-        # Constants
+        # Get constants
         cfg.get('constants', 'pmin', '1e-15')
         self._const = cfg.items('constants')
 
     def construct_kernels(self, vertex, nreg):
+        # Call paraent method
         super().construct_kernels(vertex, nreg)
 
         # Aux array
@@ -44,18 +46,25 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         # Viscosity
         self.mu = aux[0]
 
-        # Kernel argument 조절 및 Aux variable 초기화
+        # Update arguments of post kerenl
         self.post.update_args(self.upts_in, self.mu)
+
+        # Initialize viscosity
         self.post()
 
-        # Timestep Kernel argument 조절
+        # Kernel to compute timestep
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.mu, self.dt)
 
     def _make_timestep(self):
+        # Dimensions
         ndims, nface, nfvars = self.ndims, self.nface, self.nfvars
+
+        # Static variables
         vol = self._vol
         smag, svec = self._gen_snorm_fpts()
+
+        # Constants
         gamma, pmin = self._const['gamma'], self._const['pmin']
         pr = self._const['pr']
 
@@ -68,18 +77,22 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
                 p = max((gamma - 1)*(et - 0.5*rv2), pmin)
                 c = np.sqrt(gamma*p/rho)
 
+                # Sum of Wave speed * surface area
                 sum_lamdf = 0.0
                 for jdx in range(nface):
+                    # Wave speed abs(Vn) + c + max(4/3 \gamma) mu/rho/pr/length
                     lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1)) + c
                     lamdf += (1/rho*max(4/3, gamma)*mu[idx]/pr *
                               smag[jdx, idx]/vol[idx])
                     sum_lamdf += lamdf*smag[jdx, idx]
 
+                # Time step : CFL * vol / sum(lambda_f S_f)
                 dt[idx] = cfl*vol[idx] / sum_lamdf
 
         return self.be.make_loop(self.neles, timestep)
 
     def make_wave_speed(self):
+        # Dimensions and constants
         ndims, nfvars = self.ndims, self.nfvars
         gamma, pmin = self._const['gamma'], self._const['pmin']
         pr = self._const['pr']
@@ -91,16 +104,18 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
             p = max((gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho), pmin)
             c = np.sqrt(gamma*p/rho)
 
+            # Wave speed abs(Vn) + c + 1/dx/rho * max(4/3 \gamma) mu/pr
             return abs(contra) + c + 1/dx/rho * max(4/3, gamma)*mu[idx]/pr
 
         return self.be.compile(_lambdaf)
 
     def _make_post(self):
+        # Get post-process function
         _fix_nonPys = self.fix_nonPys_container()
         _compute_mu = self.mu_container()
 
         def post(i_begin, i_end, upts, mu):
-            # Update
+            # Apply the function over eleemnts
             for idx in range(i_begin, i_end):
                 _fix_nonPys(upts[:, idx])
                 mu[idx] = _compute_mu(upts[:, idx])

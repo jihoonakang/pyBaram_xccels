@@ -9,16 +9,14 @@ def run(mesh, cfg, be='none', comm='none'):
     """
     Fresh run from mesh and configuration files.
 
-    Parameters
-    ----------
-    mesh : pyBaram NativeReader object
-        pyBaram mesh
-    cfg : pyBaram INIFile object
-        configuration file
-    be : pyBaram backend object
-        Backend to compute
-    comm : mpi4py comm object
-        Initiated MPI communicator
+    :param mesh: pyBaram NativeReader object
+    :type mesh: pyBaram mesh
+    :param cfg: pyBaram INIFile object
+    :type cfg: config
+    :param be: pyBaram backend object
+    :type be: Backend
+    :param comm: mpi4py comm object
+    :type comm: MPI communicator
     """
     # Run common
     _common(mesh, None, cfg, be, comm)
@@ -28,18 +26,17 @@ def restart(mesh, soln, cfg, be='none', comm='none'):
     """
     Restarted run from mesh and configuration files.
 
-    Parameters
-    ----------
-    mesh : pyBaram NativeReader object
-        pyBaram mesh
-    soln : pyBaram NativeReader object
-        previous pyBaram solution file
-    cfg : pyBaram INIFile object
-        configuration file
-    be : pyBaram backend object
-        Backend to compute
-    comm : mpi4py comm object
-        Initiated MPI communicator
+
+    :param mesh: pyBaram NativeReader object
+    :type mesh: pyBaram mesh
+    :param soln: pyBaram NativeReader object
+    :type soln: pyBaram solution
+    :param cfg: pyBaram INIFile object
+    :type cfg: config
+    :param be: pyBaram backend object
+    :type be: Backend
+    :param comm: mpi4py comm object
+    :type comm: MPI communicator
     """
     # Check mesh and solution file
     if mesh['mesh_uuid'] != soln['mesh_uuid']:
@@ -53,7 +50,7 @@ def _common(msh, soln, cfg, backend, comm):
     if comm == 'none':
         from mpi4py import MPI
         
-        # MPI comm
+        # Initiate MPI comm world
         comm = MPI.COMM_WORLD
 
     # Get backend

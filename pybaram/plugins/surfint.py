@@ -9,17 +9,18 @@ from pybaram.utils.np import npeval
 
 
 class SurfIntPlugin(BasePlugin):
+    # Compute integrated and/or average value at boundary
     name = 'surface'
 
     def __init__(self, intg, cfg, suffix):
         self.cfg = cfg
         sect = 'soln-plugin-{}-{}'.format(self.name, suffix)
 
-        #  MPI
+        # get MPI_COMM_WORLD and rank
         self._comm = comm = MPI.COMM_WORLD
         self._rank = rank = comm.rank
 
-        # Get constants and expression
+        # Get constants and expressions of variable
         self._const = cfg.items('constants')
         items = [e.strip() for e in cfg.get(sect, 'items', 'area').split(',')]
         self._exprs = [cfg.get(sect, item, 1) for item in items]
@@ -28,14 +29,14 @@ class SurfIntPlugin(BasePlugin):
         self.ndims = ndims = intg.sys.ndims
         self._nvec = ['n{}'.format(e) for e in 'xyz'[:ndims]]
 
-        # bcmap
+        # Map as {BC type : Boundary interface objects}
         bcmap = {bc.bctype: bc for bc in intg.sys.bint}
 
-        # Get idx, norm
         self._bcinfo = bcinfo = {}
         area = 0
 
         if suffix in bcmap:
+            # Get normal vector and element index for bc
             bc = bcmap[suffix]
             t, e, _ = bc._lidx
             mag, vec = bc._mag_snorm, bc._vec_snorm
@@ -47,7 +48,7 @@ class SurfIntPlugin(BasePlugin):
                 bcinfo[i] = (eidx, nvec, nmag)
                 area += np.sum(nmag)
 
-        # Compute surface area
+        # Compute surface area at boundary
         area = np.array(area)
         if self._rank != 0:
             self._comm.Reduce(area, None, op=MPI.SUM, root=0)
@@ -56,7 +57,7 @@ class SurfIntPlugin(BasePlugin):
         
         self._area = area
 
-        # Get integration mode
+        # Check integratro mode (steady | unsteady) and frequency to compute the plugin
         self.mode = intg.mode
         if self.mode == 'steady':
             self.itout = cfg.getint(sect, 'iter-out', 100)
@@ -74,6 +75,7 @@ class SurfIntPlugin(BasePlugin):
             self.outf = csv_write(fname, header)
 
     def __call__(self, intg):
+        # Check if force is computed or not at this iteration or time
         if self.mode == 'steady':
             if not intg.isconv and intg.iter % self.itout:
                 return
@@ -84,7 +86,7 @@ class SurfIntPlugin(BasePlugin):
                 return
             txt = [intg.tcurr]
 
-        # eles, solns를 list로 변환
+        # Convert elements and solutions as list
         eles = list(intg.sys.eles)
         solns = list(intg.curr_soln)
 
@@ -95,7 +97,7 @@ class SurfIntPlugin(BasePlugin):
             pn = eles[i].primevars
             pv = eles[i].conv_to_prim(soln[:, eidx], self.cfg)
 
-            # Conpute expr
+            # Compute variables using expressions
             subs = {n : v for n,v in zip(pn, pv)}
             subs.update({n : v for n, v in zip(self._nvec, nvec)})
             subs.update(self._const)
@@ -103,10 +105,13 @@ class SurfIntPlugin(BasePlugin):
             dist.append(var_at*nmag)
         
         if len(var_at.shape) > 1:
+            # Integrate vector variable 
             integ_var = np.sum(np.hstack(dist), axis=1)
         else:
+            # Integrate scalar variable
             integ_var = np.array([np.sum(dist)])
 
+        # Collect integerated variables over all ranks
         if self._rank != 0:
             self._comm.Reduce(integ_var, None, op=MPI.SUM, root=0)
         else:
