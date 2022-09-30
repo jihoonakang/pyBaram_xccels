@@ -95,7 +95,7 @@ Turbulent thermal conductivity is computed using turbulent Prandtl number :math:
 :math:`\Theta` in viscous flux can be modified as follows.
 
 .. math::
-   \Theta_x = u \tau_{xx} + v \tau_{xy} + w \tau_{xz} + \frac{\gamma\mu}{Pr + Pr_t} T_x
+   \Theta_x = u \tau_{xx} + v \tau_{xy} + w \tau_{xz} + \frac{\gamma (\mu + \mu_t)}{Pr + Pr_t} T_x
 
 Finite Volume Method
 =====================
