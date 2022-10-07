@@ -17,14 +17,14 @@ class BaseElements:
         self.eles = eles
         self._vcon = vcon
 
-        # Dimension 설정
+        # Dimensions
         self.nvtx, self.neles, self.ndims = self.eles.shape
 
-        # Geometry 설정
+        # Get geometry
         self.geom = get_geometry(name)
         self.nface = nface = self.geom.nface
 
-        # Order
+        # Order of spatial discretization
         self.order = order = cfg.getint('solver', 'order', 1)
 
         if order > 1:
@@ -33,13 +33,12 @@ class BaseElements:
         # Gradient method
         self._grad_method = cfg.get('solver', 'gradient', 'hybrid').lower()
 
-        # ifpts
-        #if cfg.get('solver-time-integrator', 'stepper') == 'simple-point-implicit':
+        # Store neighboring element within current Elements
         self.nei_ele = np.ones((nface, self.neles), dtype=np.int)*-1
 
     def coloring(self):
         # Multi-Coloring
-        #TODO: 계산 시간 확인 필요
+        #TODO: Check computing cost (pure python implementation)
         color = np.zeros(self.neles, dtype=np.int)
         max_color = 1
         is_colored = np.empty(32, dtype=np.int)
@@ -47,17 +46,17 @@ class BaseElements:
         # Search Coloring (Search along hyperplane)
         xn = np.sum(self.xc, axis=1)
         for idx in np.argsort(xn):
-            # 이 컬러 번호가 주변에 있는지 확인용 자료
+            # is_colored : check the color of neighboring cells
             is_colored[:max_color+1] = 0
 
             for jdx in range(self.nface):
-                # 인접 셀 탐색 후 컬러 번호가 있는지 저장
+                # Seach neighboring cells, check color
                 nei = self.nei_ele[jdx, idx]
                 if nei > 0:
                     nei_color = color[nei]
                     is_colored[nei_color] = 1
             
-            # 주변에 없는 가장 작은 컬러 번호 찾기
+            # Find minimum color which is not in neighboring cells
             is_found = False
             for k in range(1, max_color+1):
                 if is_colored[k] == 0:
@@ -68,16 +67,16 @@ class BaseElements:
                         c = min(c, k)
 
             if is_found:
-                # 주변에 없으면서 가장 작은 컬러 번호 부여
+                # Assign the minimum color if not exist
                 color[idx] = c
             else:
-                # Color level 증가 후 컬러 번호 기록
+                # Increase color level and save it
                 max_color += 1
                 color[idx] = max_color
 
         ele_idx = np.arange(self.neles, dtype=np.int)
 
-        # Linked List 형식 저장
+        # Save colors as linked-list
         ncolor = np.cumsum([sum(color==i) for i in range(max_color+1)])
         icolor = np.concatenate([ele_idx[color==i] for i in range(max_color+1)])
         return ncolor, icolor, color
@@ -103,6 +102,7 @@ class BaseElements:
             unmapping = np.argsort(mapping)
 
         except:
+            # If Scipy is not existed
             mapping = np.arange(self.neles, dtype=int)
             unmapping = np.arange(self.neles, dtype=int)
 
@@ -111,39 +111,48 @@ class BaseElements:
     def set_ics_from_cfg(self):
         xc = self.geom.xc(self.eles).T
 
-        # Initialize
+        # Parse initial condition from expressions
         subs = dict(zip('xyz', xc))
         ics = [npeval(self.cfg.getexpr('soln-ics', v, self._const), subs)
                for v in self.primevars]
         ics = self.prim_to_conv(ics, self.cfg)
 
-        # Allocate and copy
+        # Allocate numpy array and copy parsed values
         self._ics = np.empty((self.nvars, self.neles))
         for i in range(self.nvars):
             self._ics[i] = ics[i]
 
     def set_ics_from_sol(self, sol):
+        # Just copy provided solution array
         self._ics = sol.astype(float)
 
     @property
     @fc.lru_cache()
     def _vol(self):
+        # Volume of element
         return np.abs(self.geom.vol(self.eles))
 
     @property
     @fc.lru_cache()
     def tot_vol(self):
+        # Sum of element volumes
         return np.sum(self._vol)
 
     @property
     @fc.lru_cache()
     def rcp_vol(self):
+        # recipropal of volume of element
         return 1/np.abs(self._vol)
 
     @fc.lru_cache()
     def _gen_snorm_fpts(self):
+        # Check the direction of mesh (right hand side or left hand side)
         sign = np.sign(self.geom.vol(self.eles))[..., None]
+
+        # Compute surface normal vector
         snorm = self.geom.snorm(self.eles)
+
+        # Split snorm as magnitude and direction vector
         mag = np.einsum('...i,...i', snorm, snorm)
         mag = np.sqrt(mag)
         vec = snorm / mag[..., None]*sign
@@ -151,38 +160,46 @@ class BaseElements:
 
     @property
     def _mag_snorm_fpts(self):
+        # Save magnitude of surface normal vector at each face point
         return self._gen_snorm_fpts()[0]
 
     @property
     def _vec_snorm_fpts(self):
+        # Save direction vector of surface normal vector at each face point
         return self._gen_snorm_fpts()[1]
 
     @property
     def mag_fnorm(self):
+        # Public property of magnitude of surface normal vector
         return self._mag_snorm_fpts
 
     @property
     @fc.lru_cache()
     def vec_fnorm(self):
+        # Public proporty of direction vector of surface noraml
         return self._vec_snorm_fpts.swapaxes(1, 2).copy()
 
     @property
     def _perimeter(self):
+        # Perimeter (or sum of all area) of element
         return np.sum(self._mag_snorm_fpts, axis=0)
 
     @property
     @fc.lru_cache()
     def le(self):
+        # Characteristic length of cell : vol / sum(S)
         return 1/(self.rcp_vol * self._perimeter)
 
     @property
     @fc.lru_cache()
     def xc(self):
+        # Cell center point
         return self.geom.xc(self.eles)
 
     @property
     @fc.lru_cache()
     def xf(self):
+        # Face center point
         return self.geom.xf(self.eles)
 
     @property
@@ -242,9 +259,11 @@ class BaseElements:
     @property
     @fc.lru_cache()
     def dxf(self):
+        # Displacement vector of face center from cell center
         return self.geom.dxf(self.eles).swapaxes(1, 2)
 
     @property
     @fc.lru_cache()
     def dxv(self):
+        # Displacement vector of vertex from cell center
         return self.geom.dxv(self.eles).swapaxes(1, 2)

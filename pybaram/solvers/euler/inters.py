@@ -13,7 +13,7 @@ class EulerIntInters(BaseAdvecIntInters):
         rt, re, rf = self._ridx
         nf, sf = self._vec_snorm, self._mag_snorm
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -22,24 +22,30 @@ class EulerIntInters(BaseAdvecIntInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
 
         def comm_flux(i_begin, i_end, *uf):
+            # Hoist allocation
             ftmp = pre()
             fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector
                 nfi = nf[:, idx]
 
+                # Left and right solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 rti, rfi, rei = rt[idx], rf[idx], re[idx]
                 ul = uf[lti][lfi, :, lei]
                 ur = uf[rti][rfi, :, rei]
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
 
                 for jdx in range(nfvars):
+                    # Save it at left and right solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
                     uf[rti][rfi, jdx, rei] = -fn[jdx]*sf[idx]
 
@@ -52,7 +58,7 @@ class EulerMPIInters(BaseAdvecMPIInters):
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -61,23 +67,29 @@ class EulerMPIInters(BaseAdvecMPIInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
 
         def comm_flux(i_begin, i_end, rhs, *uf):
+            # Hoist allocation
             ftmp = pre()
             fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector
                 nfi = nf[:, idx]
 
+                # Left and right solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 ul = uf[lti][lfi, :, lei]
                 ur = rhs[:, idx]
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
 
                 for jdx in range(nfvars):
+                    # Save it at left solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)
@@ -89,7 +101,7 @@ class EulerBCInters(BaseAdvecBCInters):
     def _make_flux(self):
         ndims, nfvars = self.ndims, self.nfvars
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -98,30 +110,38 @@ class EulerBCInters(BaseAdvecBCInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
 
+        # Get bc function (`self.bc` was defined at `baseadvec.inters`)
         bc = self.bc
 
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm,
 
         def bc_flux(i_begin, i_end, *uf):
+            # Hoist allocation
             ur = np.empty(nfvars)
             ftmp = pre()
             fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector
                 nfi = nf[:, idx]
 
+                # Left solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 ul = uf[lti][lfi, :, lei]
 
+                # Compute BC
                 bc(ul, ur, nfi)
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
 
                 for jdx in range(nfvars):
+                    # Save it at left solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, bc_flux)

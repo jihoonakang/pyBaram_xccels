@@ -2,6 +2,6 @@
 
 
 class Backend:
-    #TODO: 여러 Backend가 생길경우 확장 예정
+    #TODO: Just abstract class, will improve if other hardawer backend is developed
     name = 'base'
     

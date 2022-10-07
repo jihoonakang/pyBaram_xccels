@@ -14,15 +14,16 @@ class BaseSteadyIntegrator(BaseIntegrator):
     mode = 'steady'
 
     def __init__(self, be, cfg, msh, soln, comm):
-        # MPI communicator 저장
+        # get MPI_COMM_WORLD
         self._comm = comm
 
-        # Get Iteration
+        # Get configurations for iterators
         self.itermax = cfg.getint('solver-time-integrator', 'max-iter')
         self.tol = cfg.getfloat('solver-time-integrator', 'tolerance')
 
-        # Current iteration
+        # Set current iteration
         if soln:
+            # Get current iteration from previous result
             stats = INIFile()
             stats.fromstr(soln['stats'])
             self.iter = stats.getint('solver-time-integrator', 'iter', 0)
@@ -30,27 +31,29 @@ class BaseSteadyIntegrator(BaseIntegrator):
                 self.resid0 = np.array(stats.getlist(
                     'solver-time-integrator', 'resid0'))
         else:
+            # Initialize iteration
             self.iter = 0
 
+        # Indicator if solution is converted or not
         self.isconv = False
 
         super().__init__(be, cfg, msh, soln, comm)
 
-        # Get CFL
+        # Get CFL number 
         self._cfl0 = cfg.getfloat('solver-time-integrator', 'cfl', 1.0)
 
-        # Get CFL linear ramp
+        # Get configuration of CFL linear ramp 
         self._cfl_iter0 = cfg.getint('solver-cfl-ramp', 'iter0', self.itermax)
         self._cfl_itermax = cfg.getint('solver-cfl-ramp', 'max-iter', self.itermax)
         self._cflmax = cfg.getfloat('solver-cfl-ramp', 'max-cfl', self._cfl0)
         
-        # increment of cfl
+        # Caculate increment of cfl for CFL ramp
         if self._cfl_itermax > self._cfl_iter0:
             self._dcfl = (self._cflmax - self._cfl0) / (self._cfl_itermax - self._cfl_iter0)
         else:
             self._dcfl = 0
 
-        # Residual var
+        # Specify residual variable for monitoring
         ele = next(iter(self.sys.eles))
         self.conservars = conservars = ele.conservars
         rvar = cfg.get('solver-time-integrator', 'res-var', 'rho')
@@ -60,11 +63,12 @@ class BaseSteadyIntegrator(BaseIntegrator):
         voli = sum(self.sys.eles.tot_vol)
         self.vol = comm.allreduce(voli, op=MPI.SUM)
 
-        # Construct stages
+        # Construct kernels
         self.construct_stages()
 
     @property
     def _cfl(self):
+        # Return CFL considering CFL ramp
         if self.iter < self._cfl_iter0:
             return self._cfl0
         elif self.iter > self._cfl_itermax:
@@ -72,46 +76,10 @@ class BaseSteadyIntegrator(BaseIntegrator):
         else:
             return self._cfl0 + self._dcfl*(self.iter - self._cfl_iter0)
 
-    def complete_step(self, resid):
-        self.resid = resid
-
-        # Check if residual0 is exist or not
-        if not hasattr(self, 'resid0'):
-            # Avoid zero resid0
-            self.resid0 = [r if r != 0 else eps for r in self.resid]
-
-        self.iter += 1
-        self.completed_handler(self)
-
-    def _make_stages(self, out, *args):
-        # 계산 Kernel 함수 Python 코드 생성
-        eq_str = '+'.join('{}*upts[{}][j, idx]'.format(a, i) for a, i in zip(args[::2], args[1::2]))
-
-        # Substitute dt
-        eq_str = re.sub('dt', 'dt[idx]', eq_str)
-
-        f_txt =(
-            f"def stage(i_begin, i_end, dt, *upts):\n"
-            f"  for idx in range(i_begin, i_end):\n"
-            f"      for j in range(nvars):\n"
-        )
-        f_txt += "          upts[{}][j, idx] = {}".format(out, eq_str)
-
-        kernels = []
-        for ele in self.sys.eles:
-            # Elements 별로 Stage 컴파일
-            gvars = {'nvars' : ele.nvars}
-            lvars = {}
-            exec(f_txt, gvars, lvars)
-
-            # Loop 구성 및 Kernel 생성
-            _stage = self.be.make_loop(ele.neles, lvars['stage'])
-            kernels.append(Kernel(_stage, ele.dt, *ele.upts))
-        
-        return MetaKernel(kernels)
-
     def run(self):
+        # Run integerator until max iteration
         while self.iter < self.itermax:
+            # Compute one iteration
             self.advance_to()
 
             # Check if tolerance is satisfied
@@ -124,15 +92,62 @@ class BaseSteadyIntegrator(BaseIntegrator):
         self.completed_handler(self)
         self.print_res(residual)
 
+    def complete_step(self, resid):
+        self.resid = resid
+
+        # Check if reference residual (resid0) is existed or not
+        if not hasattr(self, 'resid0'):
+            # Avoid zero in resid0
+            self.resid0 = [r if r != 0 else eps for r in self.resid]
+
+        self.iter += 1
+        self.completed_handler(self)
+
+    def _make_stages(self, out, *args):
+        # Generate formulation of each RK stage 
+        eq_str = '+'.join('{}*upts[{}][j, idx]'.format(a, i) for a, i in zip(args[::2], args[1::2]))
+
+        # Substitute 'dt' string as dt array
+        eq_str = re.sub('dt', 'dt[idx]', eq_str)
+
+        # Generate Python function for each RK stage
+        f_txt =(
+            f"def stage(i_begin, i_end, dt, *upts):\n"
+            f"  for idx in range(i_begin, i_end):\n"
+            f"      for j in range(nvars):\n"
+        )
+        f_txt += "          upts[{}][j, idx] = {}".format(out, eq_str)
+
+        kernels = []
+        for ele in self.sys.eles:
+            # Initiate Python function of RK stage for each element
+            gvars = {'nvars' : ele.nvars}
+            lvars = {}
+            exec(f_txt, gvars, lvars)
+
+            # Generate JIT kernel by looping RK stage function
+            _stage = self.be.make_loop(ele.neles, lvars['stage'])
+            kernels.append(Kernel(_stage, ele.dt, *ele.upts))
+        
+        # Collect RK stage kernels for elements
+        return MetaKernel(kernels)
+
     def _local_dt(self):
+        # Compute timestep of each cell using CFL
         self.sys.timestep(self._cfl, self._curr_idx)
 
     def advance_to(self):
+        # Compute dt
         self._local_dt()
+
+        # Compute one RK step
         self._curr_idx, resid = self.step()
+
+        # Post actions after iteration
         self.complete_step(resid)
 
     def rhs(self, idx_in=0, idx_out=1, is_norm=False):
+        # Compute right hand side
         residi = self.sys.rhside(idx_in, idx_out, is_norm=is_norm)
 
         # Compute L2 norm residual
@@ -141,6 +156,7 @@ class BaseSteadyIntegrator(BaseIntegrator):
             return np.sqrt(resid) / self.vol
 
     def print_res(self, residual):
+        # Print residual result
         idx = self._res_idx
         res = residual[idx]
         if res < self.tol:
@@ -246,7 +262,7 @@ class LUSGS(BaseSteadyIntegrator):
 
         be = self.be
 
-        # Assign LU-SGS
+        # LU-SGS for each elements
         for ele in self.sys.eles:      
             # Get reordering result
             mapping, unmapping = ele.reordering()
@@ -255,20 +271,23 @@ class LUSGS(BaseSteadyIntegrator):
             diag = np.empty(ele.neles)
             lambdaf = np.empty((ele.nface, ele.neles))
 
+            # Get Python functions of flux and wave speed
             _flux = ele.flux_container()
             _lambdaf = ele.make_wave_speed()
             nv = (0, ele.nfvars)
 
+            # Get viscosity if exists
             mu = ele.mu if hasattr(ele, 'mu') else None
             mut = ele.mut if hasattr(ele, 'mut') else None
 
-            # Make LU-SGS
+            # Compile LU-SGS functions
             _update = make_lusgs_update(ele)
             _pre_lusgs = make_lusgs_common(ele, _lambdaf, factor=1.0)
             _lsweep, _usweep = make_serial_lusgs(
                 be, ele, nv, mapping, unmapping, _flux
             )
 
+            # Initiate LU-SGS kernel objects
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 
                 ele.upts[0], ele.dt, diag, lambdaf, mu, mut
@@ -281,17 +300,20 @@ class LUSGS(BaseSteadyIntegrator):
 
             kernels = [pre_lusgs, lsweeps, usweeps]
 
-            # Make Turbulent LU-SGS
+            # LU-SGS for turbulent variables
             if hasattr(ele, 'mut'):
+                # Get Python function of flux and wave speed for turbulent variables
                 _tflux = ele.tflux_container()
                 _tlambdaf = ele.make_turb_wave_speed()
                 tnv = (ele.nfvars, ele.nvars)
 
+                # Compile LU-SGS functions for turbulent variables
                 _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=1.0)
                 _tlsweep, _tusweep = make_serial_lusgs(
                     be, ele, tnv, mapping, unmapping, _tflux
                 )
 
+                # Initiate LU-SGS kernel objects for turbulent variables
                 pre_tlusgs = Kernel(
                     be.make_loop(ele.neles, _pre_tlusgs), 
                     ele.upts[0], ele.dt, diag, lambdaf, mu, mut
@@ -304,7 +326,10 @@ class LUSGS(BaseSteadyIntegrator):
 
                 kernels += [pre_tlusgs, tlsweeps, tusweeps]             
 
+            # Collect kernels and make meta kernels
             ele.lusgs = MetaKernel(kernels)
+
+            # Update kernel
             ele.update = Kernel(be.make_loop(ele.neles, _update),
                 ele.upts[0], ele.upts[1]
             )
@@ -328,7 +353,7 @@ class ColoredLUSGS(BaseSteadyIntegrator):
 
         be = self.be
 
-        # Assign LU-SGS
+        # colored-LU-SGS for each elements
         for ele in self.sys.eles:
             # Get Coloring result
             ncolor, icolor, lev_color = ele.coloring()
@@ -337,20 +362,23 @@ class ColoredLUSGS(BaseSteadyIntegrator):
             diag = np.empty(ele.neles)
             lambdaf = np.empty((ele.nface, ele.neles))
 
+            # Get Python functions of flux and wave speed
             _flux = ele.flux_container()
             _lambdaf = ele.make_wave_speed()
             nv = (0, ele.nfvars)
 
+            # Get viscosity if exists
             mu = ele.mu if hasattr(ele, 'mu') else None
             mut = ele.mut if hasattr(ele, 'mut') else None
 
-            # Make LU-SGS
+            # Compile LU-SGS functions
             _update = make_lusgs_update(ele)
             _pre_lusgs = make_lusgs_common(ele, _lambdaf, factor=1.0)
             _lsweep, _usweep = make_colored_lusgs(
                 be, ele, nv, icolor, lev_color, _flux
             )
 
+            # Initiate LU-SGS kernel objects
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 
                 ele.upts[0], ele.dt, diag, lambdaf, mu, mut
@@ -372,17 +400,20 @@ class ColoredLUSGS(BaseSteadyIntegrator):
 
             kernels = [pre_lusgs, *lsweeps, *usweeps]
 
-            # Make Turbulent LU-SGS
+            # LU-SGS for turbulent variables
             if hasattr(ele, 'mut'):
+                # Get Python function of flux and wave speed for turbulent variables
                 _tflux = ele.tflux_container()
                 _tlambdaf = ele.make_turb_wave_speed()
                 tnv = (ele.nfvars, ele.nvars)
 
+                # Compile LU-SGS functions for turbulent variables
                 _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=1.0)
                 _tlsweep, _tusweep = make_colored_lusgs(
                     be, ele, tnv, icolor, lev_color, _tflux
                 )
 
+                # Initiate LU-SGS kernel objects for turbulent variables
                 pre_tlusgs = Kernel(
                     be.make_loop(ele.neles, _pre_tlusgs), 
                     ele.upts[0], ele.dt, diag, lambdaf, mu, mut
@@ -404,7 +435,10 @@ class ColoredLUSGS(BaseSteadyIntegrator):
 
                 kernels += [pre_tlusgs, *tlsweeps, *tusweeps]  
 
+            # Collect kernels and make meta kernels
             ele.lusgs = MetaKernel(kernels)
+
+            # Update kernel
             ele.update = Kernel(be.make_loop(ele.neles, _update),
                 ele.upts[0], ele.upts[1]
             )

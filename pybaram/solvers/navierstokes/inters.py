@@ -14,7 +14,7 @@ class NavierStokesIntInters(BaseAdvecDiffIntInters):
         rt, re, rf = self._ridx
         nf, sf = self._vec_snorm, self._mag_snorm
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -23,34 +23,45 @@ class NavierStokesIntInters(BaseAdvecDiffIntInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+
+        # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
 
         def comm_flux(i_begin, i_end, gradf, *uf):
+            # Hoist allocation
             um = np.empty(nfvars)
             ftmp = pre()
             fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector
                 nfi = nf[:, idx]
 
+                # Left and right solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 rti, rfi, rei = rt[idx], rf[idx], re[idx]
                 ul = uf[lti][lfi, :, lei]
                 ur = uf[rti][rfi, :, rei]
+                
+                # Gradient and solution at face
                 gf = gradf[:, :, idx]
 
                 for jdx in range(nfvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
 
+                # Compute viscosity and viscous flux
                 mu = compute_mu(um)
                 visflux(um, gf, nfi, mu, fn)
 
                 for jdx in range(nfvars):
+                    # Save it at left and right solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
                     uf[rti][rfi, jdx, rei] = -fn[jdx]*sf[idx]
 
@@ -63,7 +74,7 @@ class NavierStokesMPIInters(BaseAdvecDiffMPIInters):
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -72,33 +83,44 @@ class NavierStokesMPIInters(BaseAdvecDiffMPIInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+
+        # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
 
         def comm_flux(i_begin, i_end, gradf, rhs, *uf):
+            # Hoist allocation
             um = np.empty(nfvars)
             ftmp = pre()
             fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector
                 nfi = nf[:, idx]
 
+                # Left and right solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 ul = uf[lti][lfi, :, lei]
                 ur = rhs[:, idx]
+
+                # Gradient and solution at face
                 gf = gradf[:, :, idx]
 
                 for jdx in range(nfvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
                 
+                # Compute viscosity and viscous flux
                 mu = compute_mu(um)
                 visflux(um, gf, nfi, mu, fn)
 
                 for jdx in range(nfvars):
+                    # Save it at left solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)
@@ -112,7 +134,7 @@ class NavierStokesBCInters(BaseAdvecDiffBCInters):
         lt, le, lf = self._lidx
         nf, sf = self._vec_snorm, self._mag_snorm
 
-        # Compile Arguments
+        # Compiler arguments
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
@@ -121,35 +143,50 @@ class NavierStokesBCInters(BaseAdvecDiffBCInters):
             **self._const
         }
 
+        # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
         pre, flux = get_rsolver(scheme, self.be, cplargs)
+
+        # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
         visflux = make_visflux(self.be, cplargs)
 
+        # Get bc function (`self.bc` was defined at `baseadvec.inters`)
         bc = self.bc
 
         def comm_flux(i_begin, i_end, gradf, *uf):
+            # Hoist allocation
             ur, um = np.empty(nfvars), np.empty(nfvars)
             ftmp = pre()
             fn = np.empty(nfvars)
 
             for idx in range(i_begin, i_end):
+                # Normal vector
                 nfi = nf[:, idx]
 
+                # Left solutions
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 ul = uf[lti][lfi, :, lei]
+
+                # Gradient at face
                 gf = gradf[:, :, idx]
 
+                # Compute BC
                 bc(ul, ur, nfi)
+
+                # Solution at face
                 for jdx in range(nfvars):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
+                # Compute approixmate Riemann solver
                 flux(ul, ur, nfi, fn, *ftmp)
                 
+                # Compute viscosity and viscous flux
                 mu = compute_mu(um)
                 visflux(um, gf, nfi, mu, fn)
 
                 for jdx in range(nfvars):
+                    # Save it at left solution array
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)

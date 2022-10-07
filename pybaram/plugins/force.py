@@ -7,14 +7,15 @@ from pybaram.plugins.base import BasePlugin, csv_write
 from pybaram.utils.np import npeval
 
 
-class ForcePlugin(BasePlugin):
+class ForcePlugin(BasePlugin): 
+    # Plugins to compute force over boundary
     name = 'force'
 
     def __init__(self, intg, cfg, suffix):
         self.cfg = cfg
         sect = 'soln-plugin-{}-{}'.format(self.name, suffix)
 
-        #  MPI
+        # get MPI_COMM_WORLD and rank
         self._comm = comm = MPI.COMM_WORLD
         self._rank = rank = comm.rank
 
@@ -26,14 +27,14 @@ class ForcePlugin(BasePlugin):
         area = npeval(cfg.get(sect, 'area', 1.0), const)
         self._rcp_dynp = 1.0/(0.5*rho*vel**2*area)
 
-        # Get vector
+        # Get name and direction of force vectors
         self.ndims = ndims = intg.sys.ndims
         self.dname = dname = cfg.get(sect, 'dir-name', 'xyz'[:ndims])
         dvec = np.eye(ndims)
         self.dvec = np.array([npeval(cfg.get(sect, 'dir-{}'.format(d), dvec[i]), const)
                               for i, d in enumerate(dname)])
 
-        # RANS / Laminar / 비점성 구분 
+        # Marker to distinguish laminar, rans, euler.
         if intg.sys.name in ['navier-stokes']:
             self.viscous = 'laminar'
         elif intg.sys.name.startswith('rans'):
@@ -41,13 +42,12 @@ class ForcePlugin(BasePlugin):
         else:
             self.viscous = False
 
-        # bcmap
+        # Map as {BC type : Boundary interface objects}
         bcmap = {bc.bctype: bc for bc in intg.sys.bint}
 
-        # Get idx, norm
         self._bcinfo = bcinfo = {}
-
         if suffix in bcmap:
+            # Get normal vector and element index for bc
             bc = bcmap[suffix]
             t, e, _ = bc._lidx
             mag, vec = bc._mag_snorm, bc._vec_snorm
@@ -60,11 +60,11 @@ class ForcePlugin(BasePlugin):
                 if not self.viscous:
                     bcinfo[i] = (eidx, nvec*nmag)
                 else:
-                    # Get first height length
+                    # Get first height length after wall
                     dxn = np.linalg.norm(bc._dx_adj[:, mask], axis=0)/2
                     bcinfo[i] = (eidx, nvec, nmag, dxn)
 
-        # Get integration mode
+        # Check integratro mode (steady | unsteady) and frequency to compute the plugin
         self.mode = intg.mode
         if self.mode == 'steady':
             self.itout = cfg.getint(sect, 'iter-out', 100)
@@ -85,6 +85,7 @@ class ForcePlugin(BasePlugin):
             self.outf = csv_write(fname, header)
 
     def __call__(self, intg):
+        # Check if force is computed or not at this iteration or time
         if self.mode == 'steady':
             if not intg.isconv and intg.iter % self.itout:
                 return
@@ -95,17 +96,19 @@ class ForcePlugin(BasePlugin):
                 return
             txt = [intg.tcurr]
 
-        # eles, solns를 list로 변환
+        # Convert elements and solutions as list
         eles = list(intg.sys.eles)
         solns = list(intg.curr_soln)
 
-        # Force 계산
+        # Get ambient pressure
         p0 = self._p0
         pforce = []
         if not self.viscous:
             for i, (eidx, norm) in self._bcinfo.items():
                 soln = solns[i]
                 p = eles[i].conv_to_prim(soln[:, eidx], self.cfg)[1]
+
+                # Compute pressure force (p-p0)n
                 pforce.append(np.sum((p-p0)*norm, axis=1))
         else:
             # Get viscosity
@@ -113,6 +116,7 @@ class ForcePlugin(BasePlugin):
             
             vforce = []
             for i, (eidx, nvec, nmag, dxn) in self._bcinfo.items():
+                # Convert primitive variables
                 soln = solns[i]
                 prime = eles[i].conv_to_prim(soln[:, eidx], self.cfg)
                 p, uvw = prime[1], np.array(prime[2:2+intg.sys.ndims])
@@ -121,10 +125,14 @@ class ForcePlugin(BasePlugin):
                 # Tangential velocity
                 vt = uvw - np.einsum('ij,ij->j', nvec, uvw)*nvec
                 tau = mu*vt/dxn
+
+                # Compture pressure force (p-p0)n
                 pforce.append(np.sum((p-p0)*nvec*nmag, axis=1))
+
+                # Compute viscous force (mu du/dn)n
                 vforce.append(np.sum(tau*nmag, axis=1))
 
-        # 계수 계산
+        # Compute force coefficient
         if pforce:
             cf = np.dot(self.dvec, np.sum(pforce, axis=0))*self._rcp_dynp
             if self.viscous:
@@ -136,6 +144,7 @@ class ForcePlugin(BasePlugin):
             else:
                 cf = np.zeros(len(self.dname))
 
+        # Collect coefficients over all ranks
         if self._rank != 0:
             self._comm.Reduce(cf, None, op=MPI.SUM, root=0)
         else:

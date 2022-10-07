@@ -2,6 +2,7 @@ import numpy as np
 
 
 def make_diff_flux(nvars, dnv, fluxf):
+    # Difference of flux vectors
     def _diff_flux(u, du, f, df, nf):
         for i in range(nvars):
             du[i] += u[i]
@@ -16,11 +17,11 @@ def make_diff_flux(nvars, dnv, fluxf):
 
 
 def make_lusgs_update(ele):
-    # dimensions
+    # Number of variables
     nvars = ele.nvars
 
     def _update(i_begin, i_end, uptsb, rhsb):
-        # Update
+        # Update solution by adding residual
         for idx in range(i_begin, i_end):
             for kdx in range(nvars):
                 uptsb[kdx, idx] += rhsb[kdx, idx]
@@ -29,19 +30,20 @@ def make_lusgs_update(ele):
 
 
 def make_lusgs_common(ele, _lambdaf, factor=1.0):
-    # dimensions
-    nvars, nface = ele.nvars, ele.nface
+    # Number of faces
+    nface = ele.nface
 
-    # Vectors
+    # Normal vectors for faces and displacement from cell center to neighbor cells
     fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
     dxc = np.linalg.norm(ele.dxc, axis=2)
 
-    # index
+    # Get index array for neihboring cells
     nei_ele = ele.nei_ele
 
     def _pre_lusgs(i_begin, i_end, uptsb, dt, diag, lambdaf, mu=None, mut=None):
-        # Construct Matrix
+        # Construct Matrices for LU-SGS
         for idx in range(i_begin, i_end):
+            # Diagonals of implicit operator
             diag[idx] = 1 / (dt[idx]*factor)
 
             for jdx in range(nface):
@@ -63,27 +65,31 @@ def make_lusgs_common(ele, _lambdaf, factor=1.0):
                 # Diffusive margin of wave speed at face
                 lamf *= 1.01
 
+                # Save spectral radius
                 lambdaf[jdx, idx] = lamf
+
+                # Add portion of lower and upper spectral radius
                 diag[idx] += 0.5*lamf*fnorm_vol[jdx, idx]
 
     return _pre_lusgs
 
 
 def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
-    # dimensions
+    # dimensions for variable and face
     nvars, nface = ele.nvars, ele.nface
     dnv = nv[1] - nv[0]
 
-    # Vectors
+    # Normal vectors at faces
     fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
 
-    # index
+    # Get index array for neihboring cells
     nei_ele = ele.nei_ele
 
-    # Pre-compile functions
+    # Pre-compile function to compute difference of flux vector
     _diff_flux = be.compile(make_diff_flux(nvars, dnv, _flux))
 
     def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
+        # Lower sweep via mapping
         du = np.zeros(nvars)
         f = np.zeros(dnv)
         dfj = np.zeros(dnv)
@@ -96,6 +102,7 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
                 df[kdx] = 0.0
 
             for jdx in range(nface):
+                # Compute lower portion of off-diagonal
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
@@ -112,6 +119,7 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
                                     * dub[kdx+nv[0], neib])*fnorm_vol[jdx, idx]
 
             for kdx in range(dnv):
+                # Gauss-Siedel Update residual with lower portion
                 dub[kdx+nv[0], idx] = (rhsb[kdx+nv[0], idx] -
                                        0.5*df[kdx])/(diag[idx] + dsrc[kdx+nv[0], idx])
 
@@ -121,8 +129,8 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
         dfj = np.zeros(dnv)
         df = np.zeros(nvars)
 
-        # Upper sweep (backward)
         for _idx in range(i_end-1, i_begin-1, -1):
+            # Upper sweep via mapping (reverse order)
             idx = mapping[_idx]
 
             for kdx in range(dnv):
@@ -133,6 +141,7 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
 
                 neib = nei_ele[jdx, idx]
                 if neib > -1 and unmapping[neib] > _idx:
+                    # Compute upper portion of off-diagonal
                     u = uptsb[:, neib]
                     du[:] = 0
                     for kdx in range(nv[0], nv[1]):
@@ -145,6 +154,7 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
                                     * rhsb[kdx+nv[0], neib])*fnorm_vol[jdx, idx]
 
             for kdx in range(dnv):
+                # Gauss-Siedel Update residual with upper portion
                 rhsb[kdx+nv[0], idx] = dub[kdx+nv[0], idx] - \
                     0.5*df[kdx]/(diag[idx] + dsrc[kdx+nv[0], idx])
 
@@ -152,18 +162,18 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
 
 
 def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
-    # dimensions
+    # dimensions for variable and face
     nvars, nface = ele.nvars, ele.nface
     dnv = nv[1] - nv[0]
 
-    # Vectors
+    # Normal vectors at faces
     fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
 
-    # Pre-compile functions
-    _diff_flux = be.compile(make_diff_flux(nvars, dnv, _flux))
-
-    # index
+    # Get index array for neihboring cells
     nei_ele = ele.nei_ele
+
+    # Pre-compile function to compute difference of flux vector
+    _diff_flux = be.compile(make_diff_flux(nvars, dnv, _flux))
 
     def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
         du = np.zeros(nvars)
@@ -172,7 +182,7 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
         df = np.zeros(dnv)
 
         for _idx in range(i_begin, i_end):
-            # Coloring 순서
+            # Lower sweep with coloring
             idx = icolor[_idx]
             curr_level = lcolor[idx]
 
@@ -180,6 +190,7 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                 df[kdx] = 0.0
 
             for jdx in range(nface):
+                # Compute lower portion of off-diagonal
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
@@ -198,6 +209,7 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                                        * dub[kdx+nv[0], neib])*fnorm_vol[jdx, idx]
 
             for kdx in range(dnv):
+                # Gauss-Siedel Update residual with lower portion
                 dub[kdx+nv[0], idx] = (rhsb[kdx+nv[0], idx] -
                                        0.5*df[kdx])/(diag[idx] + dsrc[kdx+nv[0], idx])
 
@@ -207,9 +219,9 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
         dfj = np.zeros(dnv)
         df = np.zeros(nvars)
 
-        # Upper sweep (backward)
         #for _idx in range(i_end-1, i_begin-1, -1):
         for _idx in range(i_begin, i_end):
+            # Upper sweep via coloring (reverse level of coloring)
             idx = icolor[_idx]
             curr_level = lcolor[idx]
 
@@ -217,6 +229,7 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                 df[kdx] = 0.0
 
             for jdx in range(nface):
+                # Compute upper portion of off-diagonal
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
@@ -234,6 +247,7 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                                         * rhsb[kdx+nv[0], neib])*fnorm_vol[jdx, idx]
 
             for kdx in range(dnv):
+                # Gauss-Siedel Update residual with upper portion
                 rhsb[kdx+nv[0], idx] = dub[kdx+nv[0], idx] - \
                     0.5*df[kdx]/(diag[idx] + dsrc[kdx+nv[0], idx])
 

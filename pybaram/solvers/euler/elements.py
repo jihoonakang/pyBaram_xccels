@@ -10,15 +10,19 @@ from pybaram.utils.np import eps
 class FluidElements:   
     @property
     def primevars(self):
+        # Primitive variables
         return ['rho', 'p'] + [k for k in 'uvw'[:self.ndims]]
 
     @property
     def conservars(self):
+        # Conservative variables
         pri = self.primevars
+
         # rho,rhou,rhov,rhow,E
         return [pri[0]] + [pri[0] + v for v in pri[2:self.ndims+2]] + ['E']
 
     def prim_to_conv(self, pri, cfg):
+        # Convert primitives to conservatives
         (rho, p), v = pri[:2], pri[2:self.ndims+2]
         rhov = [rho * u for u in v]
         gamma = cfg.getfloat('constants', 'gamma')
@@ -26,6 +30,7 @@ class FluidElements:
         return [rho] + rhov + [et]
 
     def conv_to_prim(self, con, cfg):
+        # Convert conservatives to primitives
         rho, et = con[0], con[self.ndims+1]
         v = [rhov / rho for rhov in con[1:self.ndims+1]]
         gamma = cfg.getfloat('constants', 'gamma')
@@ -33,10 +38,12 @@ class FluidElements:
         return [rho, p] + v
 
     def flux_container(self):
+        # Constants and dimensions
         gamma, pmin = self._const['gamma'], self._const['pmin']
         ndims, nfvars = self.ndims, self.nfvars
 
         def flux(u, nf, f):
+            # Compute normal component of flux
             rho, et = u[0], u[nfvars-1]
 
             contrav = dot(u, nf, ndims, 1)/rho
@@ -56,13 +63,16 @@ class FluidElements:
 
             return p, contrav
 
+        # Compile the function
         return self.be.compile(flux)
 
     def to_flow_primevars(self):
+        # Constants and dimensions
         gamma, pmin = self._const['gamma'], self._const['pmin']
         ndims, nfvars = self.ndims, self.nfvars
 
         def to_primevars(u, v):
+            # Compute primitives
             rho, et = u[0], u[nfvars-1]
 
             for i in range(ndims):
@@ -75,13 +85,16 @@ class FluidElements:
 
             return p
 
+        # Compile the function
         return self.be.compile(to_primevars)
 
     def fix_nonPys_container(self):
+        # Constants and dimensions
         gamma, pmin = self._const['gamma'], self._const['pmin']
         ndims, nfvars = self.ndims, self.nfvars
 
         def fix_nonPhy(u):
+            # Fix non-physical solution (negative density, pressure)
             rho, et = u[0], u[nfvars-1]
             if rho < 0:
                 u[0] = rho = eps
@@ -91,6 +104,7 @@ class FluidElements:
             if p < pmin:
                 u[nfvars - 1] = pmin/(gamma-1) + 0.5*dot(u, u, ndims, 1, 1)/rho
 
+        # Compile the function
         return self.be.compile(fix_nonPhy)
 
 
@@ -100,20 +114,27 @@ class EulerElements(BaseAdvecElements, FluidElements):
         self.nvars = len(self.primevars)
         self.nfvars = self.nvars
 
-        # Constants
+        # Get constants
         cfg.get('constants', 'pmin', '1e-15')
         self._const = cfg.items('constants')
 
     def construct_kernels(self, vertex, nreg):
+        # Call paraent method
         super().construct_kernels(vertex, nreg)
 
+        # Kernel to compute timestep
         self.timestep = Kernel(self._make_timestep(),
                                self.upts_in, self.dt)
 
     def _make_timestep(self):
+        # Dimensions
         ndims, nface = self.ndims, self.nface
+
+        # Static variables
         vol = self._vol
         smag, svec = self._gen_snorm_fpts()
+
+        # Constants
         gamma, pmin = self._const['gamma'], self._const['pmin']
 
         def timestep(i_begin, i_end, u, dt, cfl):
@@ -125,17 +146,19 @@ class EulerElements(BaseAdvecElements, FluidElements):
                 p = max((gamma - 1)*(et - 0.5*rv2), pmin)
                 c = np.sqrt(gamma*p/rho)
 
-                # Wave speed * surface area의 합
+                # Sum of Wave speed * surface area
                 sum_lamdf = 0.0
                 for jdx in range(nface):
                     lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1)) + c
                     sum_lamdf += lamdf*smag[jdx, idx]
 
+                # Time step : CFL * vol / sum(lambda_f S_f)
                 dt[idx] = cfl*vol[idx] / sum_lamdf
 
         return self.be.make_loop(self.neles, timestep)
 
     def make_wave_speed(self):
+        # Dimensions and constants
         ndims, nfvars = self.ndims, self.nfvars
         gamma, pmin = self._const['gamma'], self._const['pmin']
 
@@ -146,6 +169,7 @@ class EulerElements(BaseAdvecElements, FluidElements):
             p = max((gamma - 1)*(et - 0.5*dot(u, u, ndims, 1, 1)/rho), pmin)
             c = np.sqrt(gamma*p/rho)
 
+            # Wave speed : abs(Vn) + c
             return abs(contra) + c
 
         return self.be.compile(_lambdaf)

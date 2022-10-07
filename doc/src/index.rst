@@ -14,6 +14,7 @@ Welcome to pyBaram's documentation!
    user_guide
    examples
    theory
+   developer_guide
 
 Indices and tables
 ==================

@@ -10,52 +10,57 @@ import numpy as np
 
 class BaseUnsteadyIntegrator(BaseIntegrator):
     """
-    간단한 Time-marching Integrator
+    Explict Time integrator for
     - EulerExplicit
     - Runge-Kutta
     """
     mode = 'unsteady'
 
     def __init__(self, be, cfg, msh, soln, comm):
-        # MPI communicator 저장
+        # get MPI_COMM_WORLD
         self._comm = comm
 
-        # 계산 시간 리스트
+        # get list of physical time to run
         self.tlist = eval(cfg.get('solver-time-integrator', 'time'))
 
         if soln:
-            # Restart from solution
+            # Get stats and current time from restarted solution
             stats = INIFile()
             stats.fromstr(soln['stats'])
             self.tcurr = stats.getfloat('solver-time-integrator', 'tcurr')
             self.iter = stats.getint('solver-time-integrator', 'iter', 0)
         else:
-            # Initialize tcurr and iter
+            # Initialize current time and iteration
             self.tcurr = self.tlist[0]
             self.iter = 0
 
         super().__init__(be, cfg, msh, soln, comm)
 
-        # Runge-Kutta stage 계산 Kernel 생성
+        # Construct stages (for RK schemes)
         self.construct_stages()
 
         # Configure time step method
         controller = cfg.get('solver-time-integrator', 'controller', 'cfl')
         if controller == 'cfl':
+            # Time step is computed using CFL
             self.cfl = cfg.getfloat('solver-time-integrator', 'cfl')
             self._timestep = self._dt_cfl
         else:
+            # Fixed time step
             dt = cfg.getfloat('solver-time-integrator', 'dt')
             self._timestep = lambda ttag: min(dt, ttag - self.tcurr)
 
     def add_tlist(self, dt):
+        # Add intermediate time in physcal time list with stride
         tlist = self.tlist
         tmp = np.arange(tlist[0], tlist[-1], dt)
         self.tlist = np.sort(np.unique(np.concatenate([tlist, tmp])))
 
     def _make_stages(self, out, *args):
-        # 계산 Kernel 함수 Python 코드 생성
+        # Generate formulation of each RK stage 
         eq_str = '+'.join('{}*upts[{}][j, idx]'.format(a, i) for a, i in zip(args[::2], args[1::2]))
+
+        # Generate Python function for each RK stage
         f_txt =(
             f"def stage(i_begin, i_end, dt, *upts):\n"
             f"  for idx in range(i_begin, i_end):\n"
@@ -65,15 +70,16 @@ class BaseUnsteadyIntegrator(BaseIntegrator):
 
         kernels = []
         for ele in self.sys.eles:
-            # Elements 별로 Stage 컴파일
+            # Initiate Python function of RK stage for each element
             gvars = {'nvars' : ele.nvars}
             lvars = {}
             exec(f_txt, gvars, lvars)
 
-            # Loop 구성 및 Kernel 생성
+            # Generate JIT kernel by looping RK stage function
             _stage = self.be.make_loop(ele.neles, lvars['stage'])
             kernels.append(Kernel(_stage, *ele.upts, arg_trans_pos=True))
         
+        # Collect RK stage kernels for elements
         return ProxyList(kernels)
 
     def run(self):
@@ -81,18 +87,25 @@ class BaseUnsteadyIntegrator(BaseIntegrator):
             self.advance_to(t)
 
     def _dt_cfl(self, ttag):
-        # CFL 조건에 따른 timestep 계산
+        # Compute timestep of each cell using CFL
         self.sys.timestep(self.cfl, self._curr_idx)
-        dt = min(self.sys.eles.dt.min())
 
+        # Get minimum over whole cells
+        dt = min(self.sys.eles.dt.min())
         dtmin = self._comm.allreduce(dt, op=MPI.MIN)
 
+        # Adjust time step for target time
         return min(ttag - self.tcurr, dtmin)
 
     def advance_to(self, ttag):
         while self.tcurr < ttag:
+            # Compute dt
             self.dt = dt = self._timestep(ttag)
+
+            # Compute one RK step
             self._curr_idx = self.step(dt, self.tcurr)
+
+            # Post actions after iteration
             self.tcurr += dt
             self.iter += 1
             self.completed_handler(self)

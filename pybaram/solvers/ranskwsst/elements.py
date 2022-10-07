@@ -132,12 +132,12 @@ class RANSKWSSTFluidElements(ViscousFluidElements):
         return self.be.compile(src)
 
     def fix_nonPys_container(self):
+        # Constants and dimensions
         gamma, pmin = self._const['gamma'], self._const['pmin']
         ndims, nfvars, nvars = self.ndims, self.nfvars, self.nvars
 
-        # Adhoc
-
         def fix_nonPhy(u):
+            # Fix non-physical solution (negative density, pressure)
             rho, et = u[0], u[nfvars-1]
             if rho < 0:
                 u[0] = rho = eps
@@ -147,6 +147,7 @@ class RANSKWSSTFluidElements(ViscousFluidElements):
             if p < pmin:
                 u[nfvars - 1] = pmin/(gamma-1) + 0.5*dot(u, u, ndims, 1, 1)/rho
             
+            # Prevent negative turbulent variables
             u[nvars-2] = max(eps, u[nvars-2])
             u[nvars-1] = max(eps, u[nvars-1])
 
@@ -186,6 +187,7 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
         self._turb_coeffs['tgamma2'] = beta2/betast - sigmaw2*kappa**2/np.sqrt(betast)
 
     def _make_post(self):
+        # Get post-process function
         _fix_nonPys = self.fix_nonPys_container()
         _compute_mu = self.mu_container()
         _compute_mut = self.mut_container()
@@ -193,7 +195,7 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
         ydist = self.ydist
 
         def post(i_begin, i_end, upts, grad, mu, mut):
-            # Update
+            # Apply the function over eleemnts
             for idx in range(i_begin, i_end):
                 _fix_nonPys(upts[:, idx])
                 mu[idx] = _compute_mu(upts[:, idx])
@@ -204,6 +206,7 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
         return self.be.make_loop(self.neles, post)
     
     def make_turb_wave_speed(self):
+        # Dimensions and constants
         ndims = self.ndims
         sigma = 1.0
 
@@ -211,6 +214,7 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
             rho = u[0]
             contra = dot(u, nf, ndims, 1)/rho
 
+            # Wave speed : abs(Vn) + 1/dx/rho/sigma*(mu+mut)
             return abs(contra) + 1/dx*(mu[idx] + mut[idx])/rho/sigma
 
         return self.be.compile(_lambdaf)

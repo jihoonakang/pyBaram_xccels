@@ -8,20 +8,23 @@ import numpy as np
 
 class BaseAdvecDiffIntInters(BaseAdvecIntInters):
     def construct_kernels(self, elemap):
-        # View of elemenet array
+        # View of elemenet array (flux and gradient)
         fpts = [cell.fpts for cell in elemap.values()]
         dfpts = [cell.grad for cell in elemap.values()]
         nele = len(fpts)
 
-        # Gradient at face
+        # Array for gradient at face
         gradf = np.empty((self.ndims, self.nvars, self.nfpts))
 
+        # Kernel to compute differnce of solution at face
         self.compute_delu = Kernel(self._make_delu(), *fpts)
 
+        # Kernel to compute gradient at face (Averaging gradient)
         self.compute_grad_at = Kernel(
             self._make_grad_at(nele), gradf, *fpts, *dfpts
         )
 
+        # Kernel to compute flux
         self.compute_flux = Kernel(self._make_flux(), gradf, *fpts)
 
     def _make_grad_at(self, nele):
@@ -68,7 +71,7 @@ class BaseAdvecDiffIntInters(BaseAdvecIntInters):
 
 class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
     def construct_kernels(self, elemap):
-        # Buffer array
+        # Buffers
         lhs = np.empty((self.nvars, self.nfpts))
         rhs = np.empty((self.nvars, self.nfpts))
 
@@ -81,14 +84,18 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
         dfpts = [cell.grad for cell in elemap.values()]
         nele = len(fpts)
 
+        # Kernel to compute differnce of solution at face
         self.compute_delu = Kernel(self._make_delu(), rhs, *fpts)
 
+        # Kernel to compute gradient at face (Averaging gradient)
         self.compute_grad_at = Kernel(
             self._make_grad_at(), gradf, grad_rhs, *fpts
         )
 
+        # Kernel to compute flux
         self.compute_flux = Kernel(self._make_flux(), gradf, rhs, *fpts)
 
+        # Kernel for pack, send, receive
         self.pack = Kernel(self._make_pack(), lhs, *fpts)
         self.send, self.sreq = self._make_send(lhs)
         self.recv, self.rreq = self._make_recv(rhs)
@@ -160,12 +167,15 @@ class BaseAdvecDiffBCInters(BaseAdvecBCInters):
         # Gradient at face
         gradf = np.empty((self.ndims, self.nvars, self.nfpts))
 
+        # Kernel to compute differnce of solution at face
         self.compute_delu = Kernel(self._make_delu(), *fpts)
 
+        # Kernel to compute gradient at face (Averaging gradient)
         self.compute_grad_at = Kernel(
             self._make_grad_at(nele), gradf, *fpts, *dfpts
         )
 
+        # Kernel to compute flux
         self.compute_flux = Kernel(self._make_flux(), gradf, *fpts)
 
     def _make_grad_at(self, nele):

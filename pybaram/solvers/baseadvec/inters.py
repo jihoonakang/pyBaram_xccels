@@ -12,9 +12,11 @@ class BaseAdvecIntInters(BaseIntInters):
         # View of elemenet array
         fpts = [cell.fpts for cell in elemap.values()]
 
+        # Kernel to compute flux
         self.compute_flux = Kernel(self._make_flux(), *fpts)
 
         if self.order > 1:
+            # Kernel to compute differnce of solution at face
             self.compute_delu = Kernel(self._make_delu(), *fpts)
         else:
             self.compute_delu = NullKernel
@@ -43,19 +45,23 @@ class BaseAdvecMPIInters(BaseMPIInters):
     _tag = 1234
 
     def construct_kernels(self, elemap):
+        # Buffers
         lhs = np.empty((self.nvars, self.nfpts))
         rhs = np.empty((self.nvars, self.nfpts))
 
         # View of elemenet array
         fpts = [cell.fpts for cell in elemap.values()]
 
+        # Kernel to compute flux
         self.compute_flux = Kernel(self._make_flux(), rhs, *fpts)
 
         if self.order > 1:
+            # Kernel to compute differnce of solution at face
             self.compute_delu = Kernel(self._make_delu(), rhs, *fpts)
         else:
             self.compute_delu = NullKernel
 
+        # Kernel for pack, send, receive
         self.pack = Kernel(self._make_pack(), lhs, *fpts)
         self.send, self.sreq = self._make_send(lhs)
         self.recv, self.rreq = self._make_recv(rhs)
@@ -90,12 +96,15 @@ class BaseAdvecMPIInters(BaseMPIInters):
         return self.be.make_loop(self.nfpts, pack)
 
     def _sendrecv(self, mpifn, arr):
+        # MPI Send or Receive init
         req = mpifn(arr, self._dest, self._tag)
 
         def start(q):
+            # Function to save request in queue and start Send/Receive
             q.register(req)
             return req.Start()
 
+        # Return Non-blocking send/recive and request (for finalise)
         return start, req
 
     def _make_send(self, arr):
@@ -117,10 +126,10 @@ class BaseAdvecMPIInters(BaseMPIInters):
 
 class BaseAdvecBCInters(BaseBCInters):
     def construct_bc(self):
-        # BC 함수
+        # Parse BC function name
         bcf = re.sub('-', '_', self.name)
 
-        # BC constant
+        # Constants for BC function
         if self._reqs:
             bcsect = 'soln-bcs-{}'.format(self.bctype)
             bcc = {k: npeval(self.cfg.getexpr(bcsect, k, self._const))
@@ -132,6 +141,7 @@ class BaseAdvecBCInters(BaseBCInters):
 
         bcc.update(self._const)
 
+        # Get bc from `bcs.py` (in euler, navierstokes, rans...) and compile them
         self.bc = self._get_bc(self.be, bcf, bcc)
 
     def construct_kernels(self, elemap):
@@ -140,9 +150,11 @@ class BaseAdvecBCInters(BaseBCInters):
         # View of elemenet array
         fpts = [cell.fpts for cell in elemap.values()]
 
+        # Kernel to compute flux
         self.compute_flux = Kernel(self._make_flux(), *fpts)
 
         if self.order > 1:
+            # Kernel to compute differnce of solution at face
             self.compute_delu = Kernel(self._make_delu(), *fpts)
         else:
             self.compute_delu = NullKernel

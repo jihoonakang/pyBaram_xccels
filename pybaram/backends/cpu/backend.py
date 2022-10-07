@@ -8,19 +8,21 @@ import os
 
 class CPUBackend(Backend):
     """
-    CPU 계산용 Backend
-    - single thread 및 Multi-thread 지원
-    - Numba를 이용하여 Just-in Time compile
+    Backend for CPU computation
+    - Support single thread and multi threads
+    - Just-in Time compile via Numba
     """
     name = 'cpu'
 
     def __init__(self, cfg):
-        # Mutli-thread type
+        # Get mutli-thread type
         self.multithread = multithread = cfg.get('backend-cpu', 'multi-thread', default='single')
 
-        # Loop 함수 설정
+        # Loop structure for multi-thread type
         if multithread == 'single':
             self.make_loop = make_serial_loop1d
+            
+            # Enforce to disable OpenMP
             os.environ['OMP_NUM_THREADS'] = '1'
         else:
             self.make_loop = make_parallel_loop1d
@@ -30,7 +32,9 @@ class CPUBackend(Backend):
                 nb.config.THREADING_LAYER = multithread
     
     def compile(self, func, outer=False):
+        # JIT compile the Python function
         if self.multithread == 'single' or not outer:
             return nb.jit(nopython=True, fastmath=True)(func)
         else:
+            # Enable Numba parallelization if the function is not nested
             return nb.jit(nopython=True, fastmath=True, parallel=True)(func)

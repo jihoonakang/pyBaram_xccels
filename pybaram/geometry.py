@@ -9,10 +9,12 @@ def get_geometry(name, *args, **kwargs):
 
 
 class BaseFace(object):
+    # Abstract object of face
     name = 'none'
 
     @staticmethod
     def xc(x):
+        # Center points of face
         return np.average(x, axis=0)
 
 
@@ -21,6 +23,7 @@ class LineFace(BaseFace):
 
     @staticmethod
     def snorm(x):
+        # Normal vector * length of face
         dx = x[1] - x[0]
         op = np.array([[0, -1], [1, 0]])
         return np.dot(dx, op)
@@ -34,6 +37,8 @@ class TriFace(BaseFace):
         # Cross product of two sides
         op = np.array([[-1, 1, 0], [-1, 0, 1]])
         dx = np.dot(op, x.swapaxes(0, 1))
+
+        # Normal vector * area
         return 0.5*np.cross(dx[0], dx[1])
 
 
@@ -45,18 +50,23 @@ class QuadFace(BaseFace):
         # Cross product of diagonals
         op = np.array([[-1, 0, 1, 0], [0, -1, 0, 1]])
         dx = np.dot(op, x.swapaxes(0, 1))
+
+        # Normal vector * area
         return 0.5*np.cross(dx[0], dx[1])
 
 
 class BaseGeom(object):
+    # Abstract object of element
     name = 'none'
 
     @property
     def nface(self):
+        # Number of face
         return len(self._face)
 
     @property
     def fcls(self):
+        # List of face objects
         fb = {}
         for ftype, fn in self._face:
             if ftype not in fb:
@@ -65,23 +75,29 @@ class BaseGeom(object):
         return fb
 
     def xc(self, x):
+        # Center points
         return np.average(x, axis=0)
 
     def xf(self, x):
+        # Face center points
         xf = [self.fcls[ftype].xc(x[fn]) for ftype, fn in self._face]
         return np.array(xf)
 
     def dxf(self, x):
+        # Displacement vector from center to face
         return self.xf(x) - self.xc(x)
 
     def dxv(self, x):
+        # Displacement vector from center to vertex
         return x - self.xc(x)
 
     def snorm(self, x):
+        # Face Noraml*area vector 
         snorm = [self.fcls[ftype].snorm(x[fn]) for ftype, fn in self._face]
         return np.array(snorm)
 
     def vol(self, x):
+        # Volume of element
         ndim = x.shape[-1]
         return np.einsum('ijk,ijk->j', self.snorm(x), self.dxf(x)) / ndim
 

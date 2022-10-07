@@ -6,34 +6,42 @@ class BaseInters:
     name = 'base'
 
     def __init__(self, be, cfg, elemap, lhs):
-        # be and cfg 저장
+        # Save arguments
         self.be = be
         self.cfg = cfg
 
-        # Dimension 저장
+        # Dimensions
         self.nfpts = len(lhs)
         self.ele0 = ele0 = elemap[next(iter(elemap))]
         self.ndims, self.nvars, self.nfvars = ele0.ndims, ele0.nvars, ele0.nfvars
+
+        # Primitive variables
         self.primevars = ele0.primevars
+
+        # Collect constants
         self._const = cfg.items('constants')
 
+        # Order of spatial discretization
         self.order = cfg.getint('solver', 'order', 1)
 
-        # Normal Vector
+        # Normal Vector of face
         self._mag_snorm = self._get_fpts('_mag_snorm_fpts', elemap, lhs)[0]
         self._vec_snorm = self._get_fpts('_vec_snorm_fpts', elemap, lhs)
 
     def _get_fpts(self, meth, elemap, lhs):
+        # Get element property at face and sort it
         arr = [getattr(elemap[t], meth)[f, e] for t, e, f, z in lhs]
         arr = np.vstack(arr).T
         return arr.copy()
 
     def _get_upts(self, meth, elemap, lhs):
+        # Get element property and sort it
         arr = [getattr(elemap[t], meth)[e] for t, e, f, z in lhs]
         arr = np.vstack(arr).T
         return arr.copy()
 
     def _get_index(self, elemap, lhs):
+        # Parse index of elements and make index of each face point
         cell_nums = {c: i for i, c in enumerate(elemap)}
         return np.array([[cell_nums[t], e, f] for t, e, f, z in lhs]).T.copy()
 
@@ -46,12 +54,11 @@ class BaseIntInters(BaseInters):
         self._ridx = self._get_index(elemap, rhs)
 
         if self.order > 1:
-            # Delx = xc2 - xc1
+            # Delx = xc2 - xc1 across face
             dxc = [cell.dxc for cell in elemap.values()]
             self._compute_dxc(*dxc)
 
-        # ifpts
-        #if cfg.get('solver-time-integrator', 'stepper') == 'simple-point-implicit':
+        # Construct neighboring element within current Elements
         self._compute_nei_ele(elemap)
 
     def _compute_dxc(self, *dx):
@@ -77,9 +84,11 @@ class BaseIntInters(BaseInters):
                     dxc[lti][lfi, lei, jdx] = dx
                     dxc[rti][rfi, rei, jdx] = -dx
 
+        # Compute dx_adj
         self.be.make_loop(nface, compute_dxc)(self._dx_adj, *dx)
 
     def _compute_nei_ele(self, elemap):
+        # List of nei_ele
         nei_ele = [ele.nei_ele for ele in elemap.values()]
 
         lt, le, lf = self._lidx
@@ -90,6 +99,7 @@ class BaseIntInters(BaseInters):
             rti, rfi, rei = rt[idx], rf[idx], re[idx]
 
             if rti == lti:
+                # If same Elements, save neigboring element
                 nei_ele[lti][lfi, lei] = rei
                 nei_ele[rti][rfi, rei] = lei
 
@@ -104,15 +114,12 @@ class BaseBCInters(BaseInters):
         self._lidx = self._get_index(elemap, lhs)
 
         if self.order > 1:
-            # Delx
+            # Delx across face
             dxc = [cell.dxc for cell in elemap.values()]
             self._compute_dxc(*dxc)
 
+        # Compute face center at boundary
         self.xf = self._get_fpts('xf', elemap, lhs)
-        #xf = self._get_fpts('xf', elemap, lhs)
-        #xc = self._get_upts('xc', elemap, lhs)
-        # self.xf = xc + np.einsum('ij,ij->j', xf - xc,
-        #                         self._vec_snorm)*self._vec_snorm
 
     def _compute_dxc(self, *dx):
         nface, ndims = self.nfpts, self.ndims
@@ -127,7 +134,7 @@ class BaseBCInters(BaseInters):
             for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
-                # dxn = (xf - xc)*nf
+                # Compute normal component of (xf - xc) as dxn
                 dxn = 0
                 for jdx in range(ndims):
                     dxn += -dxc[lti][lfi, lei, jdx]*nf[jdx, idx]
@@ -137,6 +144,7 @@ class BaseBCInters(BaseInters):
                     dxc[lti][lfi, lei, jdx] = dx
                     dx_adj[jdx, idx] = dx
 
+        # Compute dx_adj
         self.be.make_loop(nface, compute_dxc)(self._dx_adj, *dx)
 
 
@@ -148,6 +156,7 @@ class BaseMPIInters(BaseInters):
         self._lidx = self._get_index(elemap, lhs)
 
         if self.order > 1:
+            # Delx = xc2 - xc1 across face
             dxc = [cell.dxc for cell in elemap.values()]
             self._compute_dxc(*dxc)
 
@@ -163,6 +172,7 @@ class BaseMPIInters(BaseInters):
         self._dx_adj = np.empty((ndims, nface))
 
         def pack(i_begin, i_end, buf, *dxc):
+            # Save dxc to buf for communication
             for idx in range(i_begin, i_end):
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
@@ -182,6 +192,11 @@ class BaseMPIInters(BaseInters):
                     dxc[lti][lfi, lei, jdx] = dx
                     dx_adj[jdx, idx] = dx
 
+        # Pack dx
         self.be.make_loop(nface, pack)(buf, *dx)
+
+        # Exchange halo
         comm.Sendrecv_replace(buf, dest=self._dest, source=self._dest)
+
+        # Compute dxc
         self.be.make_loop(nface, compute_dxc)(self._dx_adj, buf, *dx)
