@@ -177,3 +177,11 @@ class EulerSubOutPBCInters(EulerBCInters):
     name = 'sub-outp'
     _reqs = ['p']
 
+
+class EulerSubInvBCInters(EulerBCInters):
+    name = 'sub-inv'
+
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs, bctype)
+
+        self._reqs = ['rho'] + ['u', 'v', 'w'][:self.ndims]
