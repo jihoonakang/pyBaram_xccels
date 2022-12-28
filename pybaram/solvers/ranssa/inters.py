@@ -3,7 +3,7 @@ from pybaram.solvers.base.inters import BaseInters
 from pybaram.solvers.rans.inters import RANSIntInters, RANSBCInters, RANSMPIInters
 from pybaram.solvers.rans.inters import (RANSSlipWallBCInters, RANSAdiaWallBCInters, RANSIsothermWallBCInters,
                                          RANSSupOutBCInters, RANSSupInBCInters, RANSFarBCInters,
-                                         RANSSubOutPBCInters, RANSSubInvBCInters)
+                                         RANSSubOutPBCInters, RANSSubInvBCInters, RANSSubInpttBCInters)
 from pybaram.solvers.ranssa.bcs import get_bc
 from pybaram.utils.nb import dot
 
@@ -83,4 +83,8 @@ class RANSSASubOutPBCInters(RANSSABCInters, RANSSubOutPBCInters):
 
 
 class RANSSASubInvBCInters(RANSSABCInters, RANSSubInvBCInters):
+    pass
+
+
+class RANSSASubInpttBCInters(RANSSABCInters, RANSSubInpttBCInters):
     pass

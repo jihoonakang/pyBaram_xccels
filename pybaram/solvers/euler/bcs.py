@@ -147,3 +147,47 @@ def make_bc_far(bcargs):
         ur[nvars-1] = p / (gamma-1) + 0.5*dot(ur, ur, ndims, 1, 1)/rho
 
     return bc
+
+
+def make_bc_sub_inptt(bcargs):
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
+    gamma, pmin = bcargs['gamma'], bcargs['pmin']
+    p0, t0, R = bcargs['p0'], bcargs['t0'], bcargs['R']
+    nb = np.array(bcargs['dir'])
+
+    def bc(ul, ur, nf):
+        # NASA-TM-2011-217181.
+        # speed of sound, total enthalpy at left
+        rhol = ul[0]
+        contral = dot(ul, nb, ndims, 1)/rhol
+        pl = max((gamma - 1)*(ul[nvars-1] - 0.5 *
+                              dot(ul, ul, ndims, 1, 1)/rhol), pmin)
+        cl = np.sqrt(gamma*pl/rhol)
+        rp = -contral - 2*cl/(gamma-1)
+        ht = (ul[nvars-1] + pl)/rhol
+
+        # Solve quadratic equation to obtain sonic speed at boundary
+        a = 1 + 2/(gamma-1)
+        b = 2*rp
+        c = (gamma-1)/2*(rp**2 - 2*ht)
+        cm = np.sqrt(b**2 - 4*a*c)
+        cbp = (-b + cm)/(2*a)
+        cbm = (-b - cm)/(2*a)
+        cb = max(cbp, cbm)
+
+        # Compute speed and static values
+        u = -2*cb / (gamma-1) - rp
+        mb = u / cb
+        tratio = 1+(gamma-1)/2*mb**2
+        tb = t0 / tratio
+        pb = p0 / tratio**(gamma/(gamma-1))
+
+        rhob = pb/R/tb
+        ur[0] = rhob
+
+        for idx in range(ndims):
+            ur[idx+1] = rhob*u*nb[idx]
+
+        ur[nvars-1] = pb / (gamma-1) + 0.5*rhob*u**2
+
+    return bc

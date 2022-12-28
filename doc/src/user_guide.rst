@@ -364,6 +364,18 @@ The details of type and required variables are summarized as follows.
 
     * `turbulent variables`
 
+* ``sub-inptt`` --- subsonic inlet boundary condition with total conditions
+
+    * ``p0`` --- total pressure
+
+    * ``t0`` --- total temperature
+
+    * ``R`` --- Gas constatnt
+
+    * ``dir`` --- velocity direction components.
+
+    * `turbulent variables`
+
 * ``far`` --- far boundary condition
 
     * `all primitive variables`

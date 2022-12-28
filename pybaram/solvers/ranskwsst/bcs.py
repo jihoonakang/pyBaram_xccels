@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from pybaram.solvers.euler.bcs import (make_bc_far, make_bc_sup_out, make_bc_sup_in,
-                                       make_bc_sub_inv, make_bc_sub_outp, make_bc_slip_wall)
+                                       make_bc_sub_inv, make_bc_sub_outp, make_bc_slip_wall,
+                                       make_bc_sub_inptt)
 
 from pybaram.solvers.navierstokes.bcs import make_bc_adia_wall, make_bc_isotherm_wall
 

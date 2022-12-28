@@ -239,3 +239,12 @@ class NavierStokesSubInvBCInters(NavierStokesBCInters):
         super().__init__(be, cfg, elemap, lhs, bctype)
 
         self._reqs = ['rho'] + ['u', 'v', 'w'][:self.ndims]
+
+
+class NavierStokesSubInpttBCInters(NavierStokesBCInters):
+    name = 'sub-inptt'
+
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs, bctype)
+
+        self._reqs = ['p0', 't0', 'dir', 'R']
