@@ -11,20 +11,19 @@ def get_rsolver(name, be, cplargs):
     docstring
     """
     fname = re.sub('\+', 'p', name)
-    prepare, flux = eval('make_' + fname)(cplargs)
+    flux = eval('make_' + fname)(cplargs)
 
-    return be.compile(prepare), be.compile(flux)
+    return be.compile(flux)
 
 
 def make_rusanov(cplargs):
     nvars, gamma = cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
+    locals = cplargs['locals']
 
-    def prepare():
-        fl, fr = np.empty(nvars), np.empty(nvars)
-        return fl, fr
-
-    def rsolver(ul, ur, nf, fn, fl, fr):
+    def rsolver(ul, ur, nf, fn):
+        fl, fr = locals((nvars,)), locals((nvars,))
+        
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
 
@@ -34,21 +33,20 @@ def make_rusanov(cplargs):
         for jdx in range(nvars):
             fn[jdx] = 0.5*(fl[jdx] + fr[jdx]) - 0.5*an*(ur[jdx] - ul[jdx])
 
-    return prepare, rsolver
+    return rsolver
 
 
 def make_roem(cplargs):
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
+    locals = cplargs['locals']
 
-    def prepare():
-        fl, fr = np.empty(nvars), np.empty(nvars)
-        vl, vr = np.empty(ndims), np.empty(ndims)
-        dv, va = np.empty(ndims), np.empty(ndims)
-        du, bdq = np.empty(nvars), np.empty(nvars)
-        return fl, fr, vl, vr, dv, va, du, bdq
+    def rsolver(ul, ur, nf, fn):
+        fl, fr = locals((nvars,)), locals((nvars,))
+        vl, vr = locals((ndims,)), locals((ndims,))
+        dv, va = locals((ndims,)), locals((ndims,))
+        du, bdq = locals((nvars,)), locals((nvars,))
 
-    def rsolver(ul, ur, nf, fn, fl, fr, vl, vr, dv, va, du, bdq):
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
 
@@ -120,7 +118,7 @@ def make_roem(cplargs):
         for jdx in range(nvars):
             fn[jdx] = b1*fl[jdx] - b2*fr[jdx] + b1b2*(du[jdx] - g*bdq[jdx])
 
-    return prepare, rsolver
+    return rsolver
 
 
 def make_hllem(cplargs):
