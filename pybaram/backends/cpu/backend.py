@@ -44,6 +44,8 @@ class CPUBackend(Backend):
             return nb.jit(nopython=True, fastmath=True, parallel=True)(func)
 
     def locals(self):
+        # Ref : https://github.com/numba/numba/issues/5084
+
         np_dtype = np.float64
 
         @register_jitable(inline='always')
@@ -55,6 +57,8 @@ class CPUBackend(Backend):
         return stack_empty
 
     def locals1d(self):
+        # Ref : https://github.com/numba/numba/issues/5084
+        
         np_dtype = np.float64
 
         @register_jitable(inline='always')

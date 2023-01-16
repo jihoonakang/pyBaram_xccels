@@ -65,7 +65,7 @@ class EulerMPIInters(BaseAdvecMPIInters):
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals
+            'locals' : locals,
             **self._const
         }
 

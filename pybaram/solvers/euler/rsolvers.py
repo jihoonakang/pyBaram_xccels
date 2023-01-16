@@ -124,15 +124,14 @@ def make_roem(cplargs):
 def make_hllem(cplargs):
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
+    locals = cplargs['locals']
 
-    def prepare():
-        fl, fr = np.empty(nvars), np.empty(nvars)
-        vl, vr = np.empty(ndims), np.empty(ndims)
-        dv, va = np.empty(ndims), np.empty(ndims)
-        df = np.empty(nvars)
-        return fl, fr, vl, vr, dv, va, df
+    def rsolver(ul, ur, nf, fn):
+        fl, fr = locals((nvars,)), locals((nvars,))
+        vl, vr = locals((ndims,)), locals((ndims,))
+        dv, va = locals((ndims,)), locals((ndims,))
+        df = locals((nvars,))
 
-    def rsolver(ul, ur, nf, fn, fl, fr, vl, vr, dv, va, df):
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
 
@@ -197,20 +196,18 @@ def make_hllem(cplargs):
             fn[jdx] = b1*fl[jdx] - b2*fr[jdx] \
                 + b1b2*((ur[jdx] - ul[jdx]) - delta*df[jdx])
 
-    return prepare, rsolver
+    return rsolver
 
 
 def make_ausmpwp(cplargs):
+    locals = cplargs['locals']
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     to_primevars = cplargs['to_primevars']
 
     alpha = 3/16
 
-    def prepare():
-        vl, vr = np.empty(ndims), np.empty(ndims)
-        return vl, vr
-
-    def rsolver(ul, ur, nf, fn, vl, vr):
+    def rsolver(ul, ur, nf, fn):
+        vl, vr = locals((ndims,)), locals((ndims,))
         pl = to_primevars(ul, vl)
         pr = to_primevars(ur, vr)
 
@@ -291,21 +288,19 @@ def make_ausmpwp(cplargs):
 
         fn[nvars - 1] = cmid*(mp*ul[0]*hl + mm*ur[0]*hr)
 
-    return prepare, rsolver
+    return rsolver
 
 
 def make_ausmpup(cplargs):
+    locals = cplargs['locals']
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     to_primevars = cplargs['to_primevars']
 
     alpha, beta = 3/16, 1/8
     kp, ku = 1, 1
 
-    def prepare():
-        vl, vr = np.empty(ndims), np.empty(ndims)
-        return vl, vr
-
-    def rsolver(ul, ur, nf, fn, vl, vr):
+    def rsolver(ul, ur, nf, fn):
+        vl, vr = locals((ndims,)), locals((ndims,))
         pl = to_primevars(ul, vl)
         pr = to_primevars(ur, vr)
 
@@ -364,4 +359,4 @@ def make_ausmpup(cplargs):
 
         fn[nvars - 1] = cmid*(mp*ul[0]*hl + mm*ur[0]*hr)
 
-    return prepare, rsolver
+    return rsolver

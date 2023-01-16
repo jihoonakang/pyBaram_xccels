@@ -160,16 +160,16 @@ class BaseAdvecBCInters(BaseBCInters):
             self.compute_delu = NullKernel
 
     def _make_delu(self):
-        nvars, ndims = self.nvars, self.ndims
+        nvars = self.nvars
         lt, le, lf = self._lidx
         nf = self._vec_snorm
 
         bc = self.bc
+        locals = self.be.locals1d()
 
         def compute_delu(i_begin, i_end, *uf):
-            ur = np.empty(nvars)
-
             for idx in range(i_begin, i_end):
+                ur = locals((nvars,))
                 nfi = nf[:, idx]
 
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]

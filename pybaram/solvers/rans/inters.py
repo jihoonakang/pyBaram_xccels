@@ -26,17 +26,19 @@ class RANSIntInters(BaseAdvecDiffIntInters):
         ydist = self.ydist
 
         # Compiler arguments
+        locals = self.be.locals1d()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
+            'locals' : locals,
             **self._const
         }
 
         # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, self.be, cplargs)
+        flux = get_rsolver(scheme, self.be, cplargs)
 
         # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
@@ -47,12 +49,10 @@ class RANSIntInters(BaseAdvecDiffIntInters):
         tflux = self._make_turb_flux()
 
         def comm_flux(i_begin, i_end, gradf, *uf):
-            # Hoist allocation
-            um = np.empty(nvars)
-            ftmp = pre()
-            fn = np.empty(nvars)
-
             for idx in range(i_begin, i_end):
+                fn = locals((nvars,))
+                um = locals((nvars,))
+
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
                 ydnsi = ydist[idx]
@@ -70,7 +70,7 @@ class RANSIntInters(BaseAdvecDiffIntInters):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
                 # Compute approixmate Riemann solver
-                flux(ul, ur, nfi, fn, *ftmp)
+                flux(ul, ur, nfi, fn)
                 
                 # Compute viscosity and viscous flux
                 mu = compute_mu(um)
@@ -105,17 +105,19 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
         ydist = self.ydist
 
         # Compiler arguments
+        locals = self.be.locals1d()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
+            'locals' : locals,
             **self._const
         }
 
         # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, self.be, cplargs)
+        flux = get_rsolver(scheme, self.be, cplargs)
 
         # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
@@ -126,12 +128,10 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
         tflux = self._make_turb_flux()
 
         def comm_flux(i_begin, i_end, gradf, rhs, *uf):
-            # Hoist allocation
-            um = np.empty(nvars)
-            ftmp = pre()
-            fn = np.empty(nvars)
-
             for idx in range(i_begin, i_end):
+                fn = locals((nvars,))
+                um = locals((nvars,))
+
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
                 ydnsi = ydist[idx]
@@ -148,7 +148,7 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
                 # Compute approixmate Riemann solver
-                flux(ul, ur, nfi, fn, *ftmp)
+                flux(ul, ur, nfi, fn)
                 
                 # Compute viscosity and viscous flux
                 mu = compute_mu(um)
@@ -203,14 +203,14 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         ydist = self.ydist
 
         # Compile functions
+        locals = self.be.locals1d()
         compute_mu = self.ele0.mu_container()
 
         bc = self.bc
 
         def compute_delu(i_begin, i_end, *uf):
-            ur = np.empty(nvars)
-
             for idx in range(i_begin, i_end):
+                ur = locals((nvars,))
                 nfi = nf[:, idx]
 
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
@@ -234,17 +234,19 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         ydist = self.ydist
 
         # Compiler arguments
+        locals = self.be.locals1d()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
+            'locals' : locals,
             **self._const
         }
 
         # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, self.be, cplargs)
+        flux = get_rsolver(scheme, self.be, cplargs)
 
         # Get compiled function of viscosity and viscous flux
         compute_mu = self.ele0.mu_container()
@@ -258,12 +260,11 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         bc = self.bc
 
         def comm_flux(i_begin, i_end, gradf, *uf):
-            # Hoist allocation
-            ur, um = np.empty(nvars), np.empty(nvars)
-            ftmp = pre()
-            fn = np.empty(nvars)
-
             for idx in range(i_begin, i_end):
+                fn = locals((nvars,))
+                um = locals((nvars,))
+                ur = locals((nvars,))
+
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
                 ydnsi = ydist[idx]
@@ -286,7 +287,7 @@ class RANSBCInters(BaseAdvecDiffBCInters):
                     um[jdx] = 0.5*(ul[jdx] + ur[jdx])
 
                 # Compute approixmate Riemann solver
-                flux(ul, ur, nfi, fn, *ftmp)
+                flux(ul, ur, nfi, fn)
                 
                 # Compute viscosity and viscous flux
                 mu = compute_mu(um)
