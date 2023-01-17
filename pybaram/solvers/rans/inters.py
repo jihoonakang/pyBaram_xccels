@@ -26,13 +26,13 @@ class RANSIntInters(BaseAdvecDiffIntInters):
         ydist = self.ydist
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -50,8 +50,8 @@ class RANSIntInters(BaseAdvecDiffIntInters):
 
         def comm_flux(i_begin, i_end, gradf, *uf):
             for idx in range(i_begin, i_end):
-                fn = locals((nvars,))
-                um = locals((nvars,))
+                fn = array((nvars,))
+                um = array((nvars,))
 
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
@@ -105,13 +105,13 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
         ydist = self.ydist
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -129,8 +129,8 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
 
         def comm_flux(i_begin, i_end, gradf, rhs, *uf):
             for idx in range(i_begin, i_end):
-                fn = locals((nvars,))
-                um = locals((nvars,))
+                fn = array((nvars,))
+                um = array((nvars,))
 
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
@@ -203,14 +203,14 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         ydist = self.ydist
 
         # Compile functions
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         compute_mu = self.ele0.mu_container()
 
         bc = self.bc
 
         def compute_delu(i_begin, i_end, *uf):
             for idx in range(i_begin, i_end):
-                ur = locals((nvars,))
+                ur = array((nvars,))
                 nfi = nf[:, idx]
 
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
@@ -234,13 +234,13 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         ydist = self.ydist
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -261,9 +261,9 @@ class RANSBCInters(BaseAdvecDiffBCInters):
 
         def comm_flux(i_begin, i_end, gradf, *uf):
             for idx in range(i_begin, i_end):
-                fn = locals((nvars,))
-                um = locals((nvars,))
-                ur = locals((nvars,))
+                fn = array((nvars,))
+                um = array((nvars,))
+                ur = array((nvars,))
 
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]

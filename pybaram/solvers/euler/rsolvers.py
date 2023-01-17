@@ -19,10 +19,10 @@ def get_rsolver(name, be, cplargs):
 def make_rusanov(cplargs):
     nvars, gamma = cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
-    locals = cplargs['locals']
+    array = cplargs['array']
 
     def rsolver(ul, ur, nf, fn):
-        fl, fr = locals((nvars,)), locals((nvars,))
+        fl, fr = array((nvars,)), array((nvars,))
         
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
@@ -39,13 +39,13 @@ def make_rusanov(cplargs):
 def make_roem(cplargs):
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
-    locals = cplargs['locals']
+    array = cplargs['array']
 
     def rsolver(ul, ur, nf, fn):
-        fl, fr = locals((nvars,)), locals((nvars,))
-        vl, vr = locals((ndims,)), locals((ndims,))
-        dv, va = locals((ndims,)), locals((ndims,))
-        du, bdq = locals((nvars,)), locals((nvars,))
+        fl, fr = array((nvars,)), array((nvars,))
+        vl, vr = array((ndims,)), array((ndims,))
+        dv, va = array((ndims,)), array((ndims,))
+        du, bdq = array((nvars,)), array((nvars,))
 
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
@@ -124,13 +124,13 @@ def make_roem(cplargs):
 def make_hllem(cplargs):
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
-    locals = cplargs['locals']
+    array = cplargs['array']
 
     def rsolver(ul, ur, nf, fn):
-        fl, fr = locals((nvars,)), locals((nvars,))
-        vl, vr = locals((ndims,)), locals((ndims,))
-        dv, va = locals((ndims,)), locals((ndims,))
-        df = locals((nvars,))
+        fl, fr = array((nvars,)), array((nvars,))
+        vl, vr = array((ndims,)), array((ndims,))
+        dv, va = array((ndims,)), array((ndims,))
+        df = array((nvars,))
 
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
@@ -200,14 +200,14 @@ def make_hllem(cplargs):
 
 
 def make_ausmpwp(cplargs):
-    locals = cplargs['locals']
+    array = cplargs['array']
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     to_primevars = cplargs['to_primevars']
 
     alpha = 3/16
 
     def rsolver(ul, ur, nf, fn):
-        vl, vr = locals((ndims,)), locals((ndims,))
+        vl, vr = array((ndims,)), array((ndims,))
         pl = to_primevars(ul, vl)
         pr = to_primevars(ur, vr)
 
@@ -292,7 +292,7 @@ def make_ausmpwp(cplargs):
 
 
 def make_ausmpup(cplargs):
-    locals = cplargs['locals']
+    array = cplargs['array']
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     to_primevars = cplargs['to_primevars']
 
@@ -300,7 +300,7 @@ def make_ausmpup(cplargs):
     kp, ku = 1, 1
 
     def rsolver(ul, ur, nf, fn):
-        vl, vr = locals((ndims,)), locals((ndims,))
+        vl, vr = array((ndims,)), array((ndims,))
         pl = to_primevars(ul, vl)
         pr = to_primevars(ur, vr)
 

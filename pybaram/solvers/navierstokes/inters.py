@@ -15,13 +15,13 @@ class NavierStokesIntInters(BaseAdvecDiffIntInters):
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -35,8 +35,8 @@ class NavierStokesIntInters(BaseAdvecDiffIntInters):
 
         def comm_flux(i_begin, i_end, gradf, *uf):
             for idx in range(i_begin, i_end):
-                fn = locals((nfvars,))
-                um = locals((nfvars,))
+                fn = array((nfvars,))
+                um = array((nfvars,))
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -75,13 +75,13 @@ class NavierStokesMPIInters(BaseAdvecDiffMPIInters):
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -95,8 +95,8 @@ class NavierStokesMPIInters(BaseAdvecDiffMPIInters):
 
         def comm_flux(i_begin, i_end, gradf, rhs, *uf):
             for idx in range(i_begin, i_end):
-                fn = locals((nfvars,))
-                um = locals((nfvars,))
+                fn = array((nfvars,))
+                um = array((nfvars,))
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -135,13 +135,13 @@ class NavierStokesBCInters(BaseAdvecDiffBCInters):
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -158,9 +158,9 @@ class NavierStokesBCInters(BaseAdvecDiffBCInters):
 
         def comm_flux(i_begin, i_end, gradf, *uf):
             for idx in range(i_begin, i_end):
-                ur = locals((nfvars,))
-                um = locals((nfvars,))
-                fn = locals((nfvars,))
+                ur = array((nfvars,))
+                um = array((nfvars,))
+                fn = array((nfvars,))
 
                 # Normal vector
                 nfi = nf[:, idx]

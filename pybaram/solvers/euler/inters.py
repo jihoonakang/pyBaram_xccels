@@ -14,13 +14,13 @@ class EulerIntInters(BaseAdvecIntInters):
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -30,7 +30,7 @@ class EulerIntInters(BaseAdvecIntInters):
 
         def comm_flux(i_begin, i_end, *uf):
             for idx in range(i_begin, i_end):
-                fn = locals((nfvars,))
+                fn = array((nfvars,))
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -59,13 +59,13 @@ class EulerMPIInters(BaseAdvecMPIInters):
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -75,7 +75,7 @@ class EulerMPIInters(BaseAdvecMPIInters):
 
         def comm_flux(i_begin, i_end, rhs, *uf):
             for idx in range(i_begin, i_end):
-                fn = locals((nfvars,))
+                fn = array((nfvars,))
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -102,13 +102,13 @@ class EulerBCInters(BaseAdvecBCInters):
         ndims, nfvars = self.ndims, self.nfvars
 
         # Compiler arguments
-        locals = self.be.locals1d()
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
-            'locals' : locals,
+            'array' : array,
             **self._const
         }
 
@@ -124,8 +124,8 @@ class EulerBCInters(BaseAdvecBCInters):
 
         def bc_flux(i_begin, i_end, *uf):
             for idx in range(i_begin, i_end):
-                fn = locals((nfvars,))
-                ur = locals((nfvars,))
+                fn = array((nfvars,))
+                ur = array((nfvars,))
 
                 # Normal vector
                 nfi = nf[:, idx]

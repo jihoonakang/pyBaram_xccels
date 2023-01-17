@@ -43,21 +43,9 @@ class CPUBackend(Backend):
             # Enable Numba parallelization if the function is not nested
             return nb.jit(nopython=True, fastmath=True, parallel=True)(func)
 
-    def locals(self):
-        # Ref : https://github.com/numba/numba/issues/5084
-
-        np_dtype = np.float64
-
-        @register_jitable(inline='always')
-        def stack_empty(size, shape, dtype=np_dtype):
-            arr_ptr=stack_empty_impl(size,dtype)
-            arr=nb.carray(arr_ptr,shape)
-            return arr
-
-        return stack_empty
-
-    def locals1d(self):
-        # Ref : https://github.com/numba/numba/issues/5084
+    def local_array(self):
+        # Stack-allocated array
+        # Original code from https://github.com/numba/numba/issues/5084
         
         np_dtype = np.float64
 
