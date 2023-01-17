@@ -46,6 +46,7 @@ class CPUBackend(Backend):
     def local_array(self):
         # Stack-allocated array
         # Original code from https://github.com/numba/numba/issues/5084
+        # Modified for only 1-D array
         
         np_dtype = np.float64
 
