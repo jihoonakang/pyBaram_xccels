@@ -11,20 +11,19 @@ def get_rsolver(name, be, cplargs):
     docstring
     """
     fname = re.sub('\+', 'p', name)
-    prepare, flux = eval('make_' + fname)(cplargs)
+    flux = eval('make_' + fname)(cplargs)
 
-    return be.compile(prepare), be.compile(flux)
+    return be.compile(flux)
 
 
 def make_rusanov(cplargs):
     nvars, gamma = cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
+    array = cplargs['array']
 
-    def prepare():
-        fl, fr = np.empty(nvars), np.empty(nvars)
-        return fl, fr
-
-    def rsolver(ul, ur, nf, fn, fl, fr):
+    def rsolver(ul, ur, nf, fn):
+        fl, fr = array((nvars,)), array((nvars,))
+        
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
 
@@ -34,21 +33,20 @@ def make_rusanov(cplargs):
         for jdx in range(nvars):
             fn[jdx] = 0.5*(fl[jdx] + fr[jdx]) - 0.5*an*(ur[jdx] - ul[jdx])
 
-    return prepare, rsolver
+    return rsolver
 
 
 def make_roem(cplargs):
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
+    array = cplargs['array']
 
-    def prepare():
-        fl, fr = np.empty(nvars), np.empty(nvars)
-        vl, vr = np.empty(ndims), np.empty(ndims)
-        dv, va = np.empty(ndims), np.empty(ndims)
-        du, bdq = np.empty(nvars), np.empty(nvars)
-        return fl, fr, vl, vr, dv, va, du, bdq
+    def rsolver(ul, ur, nf, fn):
+        fl, fr = array((nvars,)), array((nvars,))
+        vl, vr = array((ndims,)), array((ndims,))
+        dv, va = array((ndims,)), array((ndims,))
+        du, bdq = array((nvars,)), array((nvars,))
 
-    def rsolver(ul, ur, nf, fn, fl, fr, vl, vr, dv, va, du, bdq):
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
 
@@ -120,21 +118,20 @@ def make_roem(cplargs):
         for jdx in range(nvars):
             fn[jdx] = b1*fl[jdx] - b2*fr[jdx] + b1b2*(du[jdx] - g*bdq[jdx])
 
-    return prepare, rsolver
+    return rsolver
 
 
 def make_hllem(cplargs):
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     flux = cplargs['flux']
+    array = cplargs['array']
 
-    def prepare():
-        fl, fr = np.empty(nvars), np.empty(nvars)
-        vl, vr = np.empty(ndims), np.empty(ndims)
-        dv, va = np.empty(ndims), np.empty(ndims)
-        df = np.empty(nvars)
-        return fl, fr, vl, vr, dv, va, df
+    def rsolver(ul, ur, nf, fn):
+        fl, fr = array((nvars,)), array((nvars,))
+        vl, vr = array((ndims,)), array((ndims,))
+        dv, va = array((ndims,)), array((ndims,))
+        df = array((nvars,))
 
-    def rsolver(ul, ur, nf, fn, fl, fr, vl, vr, dv, va, df):
         pl, contravl = flux(ul, nf, fl)
         pr, contravr = flux(ur, nf, fr)
 
@@ -199,20 +196,18 @@ def make_hllem(cplargs):
             fn[jdx] = b1*fl[jdx] - b2*fr[jdx] \
                 + b1b2*((ur[jdx] - ul[jdx]) - delta*df[jdx])
 
-    return prepare, rsolver
+    return rsolver
 
 
 def make_ausmpwp(cplargs):
+    array = cplargs['array']
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     to_primevars = cplargs['to_primevars']
 
     alpha = 3/16
 
-    def prepare():
-        vl, vr = np.empty(ndims), np.empty(ndims)
-        return vl, vr
-
-    def rsolver(ul, ur, nf, fn, vl, vr):
+    def rsolver(ul, ur, nf, fn):
+        vl, vr = array((ndims,)), array((ndims,))
         pl = to_primevars(ul, vl)
         pr = to_primevars(ur, vr)
 
@@ -293,21 +288,19 @@ def make_ausmpwp(cplargs):
 
         fn[nvars - 1] = cmid*(mp*ul[0]*hl + mm*ur[0]*hr)
 
-    return prepare, rsolver
+    return rsolver
 
 
 def make_ausmpup(cplargs):
+    array = cplargs['array']
     ndims, nvars, gamma = cplargs['ndims'], cplargs['nfvars'], cplargs['gamma']
     to_primevars = cplargs['to_primevars']
 
     alpha, beta = 3/16, 1/8
     kp, ku = 1, 1
 
-    def prepare():
-        vl, vr = np.empty(ndims), np.empty(ndims)
-        return vl, vr
-
-    def rsolver(ul, ur, nf, fn, vl, vr):
+    def rsolver(ul, ur, nf, fn):
+        vl, vr = array((ndims,)), array((ndims,))
         pl = to_primevars(ul, vl)
         pr = to_primevars(ur, vr)
 
@@ -366,4 +359,4 @@ def make_ausmpup(cplargs):
 
         fn[nvars - 1] = cmid*(mp*ul[0]*hl + mm*ur[0]*hr)
 
-    return prepare, rsolver
+    return rsolver

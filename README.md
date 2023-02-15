@@ -21,6 +21,10 @@ Documentation
 -------------
 Information on install, usage and implementation of pyBaram can be found in the [documentation](https://aadl_inha.gitlab.io/pyBaram/).
 
+Reference
+---------
+[pyBaram: Parallel compressible flow solver in high-performance Python for teaching and research, SoftwareX, 2022](https://doi.org/10.1016/j.softx.2022.101272)
+
 Authors
 --------
 Jin Seok Park <jinseok.park@inha.ac.kr>

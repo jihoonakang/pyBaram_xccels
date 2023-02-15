@@ -1,9 +1,10 @@
 import numpy as np
 
 
-def make_diff_flux(nvars, dnv, fluxf):
+def make_diff_flux(nvars, dnv, fluxf, array):
     # Difference of flux vectors
-    def _diff_flux(u, du, f, df, nf):
+    def _diff_flux(u, du, df, nf):
+        f = array((dnv,))
         for i in range(nvars):
             du[i] += u[i]
 
@@ -85,18 +86,20 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
     # Get index array for neihboring cells
     nei_ele = ele.nei_ele
 
+    # Local array function
+    array = be.local_array()
+
     # Pre-compile function to compute difference of flux vector
-    _diff_flux = be.compile(make_diff_flux(nvars, dnv, _flux))
+    _diff_flux = be.compile(make_diff_flux(nvars, dnv, _flux, array))
 
     def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
         # Lower sweep via mapping
-        du = np.zeros(nvars)
-        f = np.zeros(dnv)
-        dfj = np.zeros(dnv)
-        df = np.zeros(dnv)
-
         for _idx in range(i_begin, i_end):
             idx = mapping[_idx]
+
+            du = array((nvars,))
+            dfj = array((dnv,))
+            df = array((dnv,))
 
             for kdx in range(dnv):
                 df[kdx] = 0.0
@@ -108,11 +111,14 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
                 neib = nei_ele[jdx, idx]
                 if neib > -1 and unmapping[neib] < _idx:
                     u = uptsb[:, neib]
-                    du[:] = 0
+
+                    for kdx in range(nvars):
+                        du[kdx] = 0.0
+
                     for kdx in range(nv[0], nv[1]):
                         du[kdx] = dub[kdx, neib]
 
-                    _diff_flux(u, du, f, dfj, nf)
+                    _diff_flux(u, du, dfj, nf)
 
                     for kdx in range(dnv):
                         df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
@@ -124,14 +130,13 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
                                        0.5*df[kdx])/(diag[idx] + dsrc[kdx+nv[0], idx])
 
     def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
-        du = np.zeros(nvars)
-        f = np.zeros(dnv)
-        dfj = np.zeros(dnv)
-        df = np.zeros(nvars)
-
         for _idx in range(i_end-1, i_begin-1, -1):
             # Upper sweep via mapping (reverse order)
             idx = mapping[_idx]
+
+            du = array((nvars,))
+            dfj = array((dnv,))
+            df = array((dnv,))
 
             for kdx in range(dnv):
                 df[kdx] = 0.0
@@ -143,11 +148,14 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
                 if neib > -1 and unmapping[neib] > _idx:
                     # Compute upper portion of off-diagonal
                     u = uptsb[:, neib]
-                    du[:] = 0
+
+                    for kdx in range(nvars):
+                        du[kdx] = 0.0
+                        
                     for kdx in range(nv[0], nv[1]):
                         du[kdx] = rhsb[kdx, neib]
 
-                    _diff_flux(u, du, f, dfj, nf)
+                    _diff_flux(u, du, dfj, nf)
 
                     for kdx in range(dnv):
                         df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
@@ -172,19 +180,21 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
     # Get index array for neihboring cells
     nei_ele = ele.nei_ele
 
+    # Local array function
+    array = be.local_array()
+
     # Pre-compile function to compute difference of flux vector
-    _diff_flux = be.compile(make_diff_flux(nvars, dnv, _flux))
+    _diff_flux = be.compile(make_diff_flux(nvars, dnv, _flux, array))
 
     def _lower_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
-        du = np.zeros(nvars)
-        f = np.zeros(dnv)
-        dfj = np.zeros(dnv)
-        df = np.zeros(dnv)
-
         for _idx in range(i_begin, i_end):
             # Lower sweep with coloring
             idx = icolor[_idx]
             curr_level = lcolor[idx]
+
+            du = array((nvars,))
+            dfj = array((dnv,))
+            df = array((dnv,))
 
             for kdx in range(dnv):
                 df[kdx] = 0.0
@@ -198,11 +208,14 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                     if lcolor[neib] < curr_level:
                     #if neib < idx:
                         u = uptsb[:, neib]
-                        du[:] = 0
+
                         for kdx in range(nvars):
+                            du[kdx] = 0.0
+                            
+                        for kdx in range(nv[0], nv[1]):
                             du[kdx] = dub[kdx, neib]
 
-                        _diff_flux(u, du, f, dfj, nf)
+                        _diff_flux(u, du, dfj, nf)
 
                         for kdx in range(dnv):
                             df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
@@ -214,16 +227,15 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                                        0.5*df[kdx])/(diag[idx] + dsrc[kdx+nv[0], idx])
 
     def _upper_sweep(i_begin, i_end, uptsb, rhsb, dub, diag, dsrc, lambdaf):
-        du = np.zeros(nvars)
-        f = np.zeros(dnv)
-        dfj = np.zeros(dnv)
-        df = np.zeros(nvars)
-
         #for _idx in range(i_end-1, i_begin-1, -1):
         for _idx in range(i_begin, i_end):
             # Upper sweep via coloring (reverse level of coloring)
             idx = icolor[_idx]
             curr_level = lcolor[idx]
+
+            du = array((nvars,))
+            dfj = array((dnv,))
+            df = array((dnv,))
 
             for kdx in range(dnv):
                 df[kdx] = 0.0
@@ -236,11 +248,14 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                 if neib > -1:
                     if lcolor[neib] > curr_level:
                         u = uptsb[:, neib]
-                        du[:] = 0
+                        
                         for kdx in range(nvars):
+                            du[kdx] = 0.0
+                            
+                        for kdx in range(nv[0], nv[1]):
                             du[kdx] = rhsb[kdx, neib]
 
-                        _diff_flux(u, du, f, dfj, nf)
+                        _diff_flux(u, du, dfj, nf)
 
                         for kdx in range(dnv):
                             df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]

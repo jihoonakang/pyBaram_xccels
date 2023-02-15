@@ -37,13 +37,17 @@ class BaseAdvecDiffIntInters(BaseAdvecIntInters):
         tf = self._dx_adj * inv_tf
         avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 
+        # Stack-allocated array
+        array = self.be.local_array()
+
         def grad_at(i_begin, i_end, gradf, *uf):
             # Parse element views (fpts, grad)
             du = uf[:nele]
             gradu = uf[nele:]
-            gf = np.empty(ndims)
 
             for idx in range(i_begin, i_end):
+                gf = array((ndims,))
+
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
                 rti, rfi, rei = rt[idx], rf[idx], re[idx]
 
@@ -113,10 +117,13 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
         tf = self._dx_adj * inv_tf
         avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 
-        def grad_at(i_begin, i_end, gradf, grad_rhs, *du):
-            gf = np.empty(ndims)
+        # Stack-allocated array
+        array = self.be.local_array()
 
+        def grad_at(i_begin, i_end, gradf, grad_rhs, *du):
             for idx in range(i_begin, i_end):
+                gf = array((ndims,))
+
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
                 tfi = tf[:, idx]
@@ -187,13 +194,17 @@ class BaseAdvecDiffBCInters(BaseAdvecBCInters):
         tf = self._dx_adj * inv_tf
         avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 
+        # Stack-allocated array
+        array = self.be.local_array()
+
         def grad_at(i_begin, i_end, gradf, *uf):
             # Parse element views (fpts, grad)
             du = uf[:nele]
             gradu = uf[nele:]
-            gf = np.empty(ndims)
 
             for idx in range(i_begin, i_end):
+                gf = array((ndims,))
+
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
 
                 tfi = tf[:, idx]

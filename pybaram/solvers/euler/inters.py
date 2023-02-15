@@ -14,24 +14,24 @@ class EulerIntInters(BaseAdvecIntInters):
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compiler arguments
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
+            'array' : array,
             **self._const
         }
 
         # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, self.be, cplargs)
+        flux = get_rsolver(scheme, self.be, cplargs)
 
         def comm_flux(i_begin, i_end, *uf):
-            # Hoist allocation
-            ftmp = pre()
-            fn = np.empty(nfvars)
-
             for idx in range(i_begin, i_end):
+                fn = array((nfvars,))
+
                 # Normal vector
                 nfi = nf[:, idx]
 
@@ -42,7 +42,7 @@ class EulerIntInters(BaseAdvecIntInters):
                 ur = uf[rti][rfi, :, rei]
 
                 # Compute approixmate Riemann solver
-                flux(ul, ur, nfi, fn, *ftmp)
+                flux(ul, ur, nfi, fn)
 
                 for jdx in range(nfvars):
                     # Save it at left and right solution array
@@ -59,24 +59,24 @@ class EulerMPIInters(BaseAdvecMPIInters):
         nf, sf = self._vec_snorm, self._mag_snorm
 
         # Compiler arguments
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
+            'array' : array,
             **self._const
         }
 
         # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, self.be, cplargs)
+        flux = get_rsolver(scheme, self.be, cplargs)
 
         def comm_flux(i_begin, i_end, rhs, *uf):
-            # Hoist allocation
-            ftmp = pre()
-            fn = np.empty(nfvars)
-
             for idx in range(i_begin, i_end):
+                fn = array((nfvars,))
+
                 # Normal vector
                 nfi = nf[:, idx]
 
@@ -86,7 +86,7 @@ class EulerMPIInters(BaseAdvecMPIInters):
                 ur = rhs[:, idx]
 
                 # Compute approixmate Riemann solver
-                flux(ul, ur, nfi, fn, *ftmp)
+                flux(ul, ur, nfi, fn)
 
                 for jdx in range(nfvars):
                     # Save it at left solution array
@@ -102,17 +102,19 @@ class EulerBCInters(BaseAdvecBCInters):
         ndims, nfvars = self.ndims, self.nfvars
 
         # Compiler arguments
+        array = self.be.local_array()
         cplargs = {
             'flux' : self.ele0.flux_container(),
             'to_primevars' : self.ele0.to_flow_primevars(),
             'ndims' : ndims,
             'nfvars' : nfvars,
+            'array' : array,
             **self._const
         }
 
         # Get numerical schems from `rsolvers.py`
         scheme = self.cfg.get('solver', 'riemann-solver')
-        pre, flux = get_rsolver(scheme, self.be, cplargs)
+        flux = get_rsolver(scheme, self.be, cplargs)
 
         # Get bc function (`self.bc` was defined at `baseadvec.inters`)
         bc = self.bc
@@ -121,12 +123,10 @@ class EulerBCInters(BaseAdvecBCInters):
         nf, sf = self._vec_snorm, self._mag_snorm,
 
         def bc_flux(i_begin, i_end, *uf):
-            # Hoist allocation
-            ur = np.empty(nfvars)
-            ftmp = pre()
-            fn = np.empty(nfvars)
-
             for idx in range(i_begin, i_end):
+                fn = array((nfvars,))
+                ur = array((nfvars,))
+
                 # Normal vector
                 nfi = nf[:, idx]
 
@@ -138,7 +138,7 @@ class EulerBCInters(BaseAdvecBCInters):
                 bc(ul, ur, nfi)
 
                 # Compute approixmate Riemann solver
-                flux(ul, ur, nfi, fn, *ftmp)
+                flux(ul, ur, nfi, fn)
 
                 for jdx in range(nfvars):
                     # Save it at left solution array
@@ -177,3 +177,20 @@ class EulerSubOutPBCInters(EulerBCInters):
     name = 'sub-outp'
     _reqs = ['p']
 
+
+class EulerSubInvBCInters(EulerBCInters):
+    name = 'sub-inv'
+
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs, bctype)
+
+        self._reqs = ['rho'] + ['u', 'v', 'w'][:self.ndims]
+
+
+class EulerSubInpttBCInters(EulerBCInters):
+    name = 'sub-inptt'
+
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs, bctype)
+
+        self._reqs = ['p0', 'cpt0', 'dir']

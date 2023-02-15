@@ -2,8 +2,10 @@
 from pybaram.solvers.euler.elements import FluidElements
 from pybaram.solvers.baseadvecdiff import BaseAdvecDiffElements
 from pybaram.backends.types import Kernel
+from pybaram.utils.np import npeval
 from pybaram.utils.nb import dot
 
+import functools as fc
 import numpy as np
 
 
@@ -14,13 +16,57 @@ class ViscousFluidElements(FluidElements):
     def auxvars(self):
         return ['mu']
 
+    @fc.lru_cache()
     def mu_container(self):
-        mu = self._const['mu']
+        viscosity = self.cfg.get('solver', 'viscosity', 'constant')
 
-        # TODO: Sutherland Law
-        # Constant viscosity
-        def compute_mu(*args):
-            return mu
+        if viscosity == 'constant':
+            mu = self._const['mu']
+
+            def compute_mu(*args):
+                # Constant viscosity
+                return mu
+            
+        elif viscosity == 'sutherland':
+            # Constants and dimensions
+            gamma, pmin = self._const['gamma'], self._const['pmin']
+            ndims, nfvars = self.ndims, self.nfvars
+
+            # Minimum value of total enthalpy
+            Hmin = gamma/(gamma-1)*pmin
+
+            # Free-stream enthalpy
+            try:
+                CpTf = self._const['cptf']
+            except:
+                KeyError("Free-stream enthalpy is not given (CpTf)")
+
+            # Reference viscosity by Sutherland Law (Dimensional unit!)
+            # All default values are given in MKS units.
+            sect = 'solver-viscosity-sutherland'
+            c1 = npeval(self.cfg.getexpr(sect, 'c1', self._const, 1.458e-6))
+            Ts = npeval(self.cfg.getexpr(sect, 'Ts', self._const, 110.4))
+            Tref = npeval(self.cfg.getexpr(sect, 'Tref', self._const, 288.15))
+
+            # Compute Viscosity
+            muref = c1 * Tref**1.5 / (Tref + Ts)
+            TsTref = Ts/Tref
+
+            def compute_mu(u):
+                rho, et = u[0], u[nfvars-1]
+
+                # Specific Enthalpy
+                CpT = max(gamma * (et / rho - 0.5*dot(u, u, ndims, 1, 1)), Hmin/rho)
+                
+                # Temperature ratio
+                Tratio = CpT / CpTf
+
+                # Sutherland Law
+                return muref*Tratio**1.5*(1 + TsTref) / (Tratio + TsTref)
+                
+        else:
+            raise ValueError("Unspported viscosity")
+        
 
         return self.be.compile(compute_mu)
 

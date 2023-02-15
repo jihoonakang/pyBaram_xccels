@@ -64,7 +64,7 @@ class SurfIntPlugin(BasePlugin):
             lead = ['iter']
         else:
             self.dtout = cfg.getfloat(sect, 'dt-out')
-            self.tout_next = intg.tcurr
+            self.tout_next = intg.tcurr + self.dtout
             intg.add_tlist(self.dtout)
             lead = ['t']
 
@@ -84,6 +84,9 @@ class SurfIntPlugin(BasePlugin):
         else:
             if abs(intg.tcurr - self.tout_next) > 1e-6:
                 return
+
+            self.tout_next += self.dtout
+            
             txt = [intg.tcurr]
 
         # Convert elements and solutions as list

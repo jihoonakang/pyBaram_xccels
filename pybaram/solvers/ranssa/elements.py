@@ -4,6 +4,8 @@ from pybaram.solvers.navierstokes import ViscousFluidElements
 from pybaram.utils.nb import dot
 from pybaram.utils.np import eps
 
+import functools as fc
+
 
 class RANSSAFluidElements(ViscousFluidElements):
     name = 'rans-sa'
@@ -27,6 +29,7 @@ class RANSSAFluidElements(ViscousFluidElements):
     def conv_to_prim(self, con, cfg):
         return super().conv_to_prim(con, cfg) + [con[-1]]
 
+    @fc.lru_cache()
     def mut_container(self):
         nvars = self.nvars
 

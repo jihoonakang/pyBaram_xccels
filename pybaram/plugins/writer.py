@@ -33,7 +33,7 @@ class WriterPlugin(BasePlugin):
         self.mode = mode = intg.mode
         if mode == 'unsteady':
             self.dtout = cfg.getfloat('soln-plugin-writer', 'dt-out')
-            self.tout_next = intg.tcurr
+            self.tout_next = intg.tcurr + self.dtout
             intg.add_tlist(self.dtout)
         else:
             self.itout = cfg.getint('soln-plugin-writer', 'iter-out', 100)
@@ -97,9 +97,7 @@ class WriterPlugin(BasePlugin):
 
         if intg.iter == 0:
             # Save initial field
-            self(intg)
-        elif self.mode == 'unsteady':
-            self.tout_next += self.dtout
+            self(intg)           
 
     def __call__(self, intg):
         if self.mode == 'unsteady':

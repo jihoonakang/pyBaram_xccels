@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import functools as fc
 import numpy as np
 
 from pybaram.solvers.baseadvec import BaseAdvecElements
@@ -37,6 +38,7 @@ class FluidElements:
         p = (gamma - 1) * (et - 0.5 * rho * sum(u * u for u in v))
         return [rho, p] + v
 
+    @fc.lru_cache()
     def flux_container(self):
         # Constants and dimensions
         gamma, pmin = self._const['gamma'], self._const['pmin']
@@ -66,6 +68,7 @@ class FluidElements:
         # Compile the function
         return self.be.compile(flux)
 
+    @fc.lru_cache()
     def to_flow_primevars(self):
         # Constants and dimensions
         gamma, pmin = self._const['gamma'], self._const['pmin']
