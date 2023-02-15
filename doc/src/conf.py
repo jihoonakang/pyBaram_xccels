@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../../'))
 # -- Project information -----------------------------------------------------
 
 project = 'pyBaram'
-copyright = '2022, Inha University'
+copyright = '2022-2023, Inha University'
 author = 'Jin Seok Park'
 
 # The full version, including alpha/beta/rc tags
