@@ -4,6 +4,7 @@ from pybaram.solvers.navierstokes import ViscousFluidElements
 from pybaram.utils.nb import dot
 from pybaram.utils.np import eps
 
+import functools as fc
 import numpy as np
 
 
@@ -29,6 +30,7 @@ class RANSKWSSTFluidElements(ViscousFluidElements):
     def conv_to_prim(self, con, cfg):
         return super().conv_to_prim(con, cfg) + [con[-2]/con[0], con[-1]/con[0]]    
 
+    @fc.lru_cache()
     def mut_container(self):
         from pybaram.solvers.rans.turbulent import make_vorticity
         from pybaram.solvers.ranskwsst.turbulent import make_blendingF2
@@ -152,6 +154,7 @@ class RANSKWSSTFluidElements(ViscousFluidElements):
             u[nvars-1] = max(eps, u[nvars-1])
 
         return self.be.compile(fix_nonPhy)
+
 
 class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
     def __init__(self, be, cfg, name, eles, vcon):

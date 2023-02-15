@@ -361,4 +361,4 @@ class RANSSubInpttBCInters(RANSBCInters):
     def __init__(self, be, cfg, elemap, lhs, bctype):
         super().__init__(be, cfg, elemap, lhs, bctype)
 
-        self._reqs = ['p0', 't0', 'dir', 'R'] + self.primevars[self.nfvars:]
+        self._reqs = ['p0', 'cpt0', 'dir'] + self.primevars[self.nfvars:]

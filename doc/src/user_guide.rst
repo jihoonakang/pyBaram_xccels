@@ -123,16 +123,20 @@ Followings are the essential constant depending on the equation to solve.
 
     `float`
 
-2. mu --- dynamic viscosity. It should be defined for viscous simulation.
+2. mu --- dynamic viscosity. It should be defined for constant viscosity.
 
     `float`
 
-3. Pr --- Prandtl number. It should be defined for viscous simulation.
+3. CpTf --- Free-stream enthalpy . It should be defined when Sutherland law is used.
+    
+    `float`
+
+4. Pr --- Prandtl number. It should be defined for viscous simulation.
    For conventional air, :math:`Pr=0.72`.
 
     `float`
 
-4. Prt --- Turbulent Prandtl number. It should be defined for turbulent simulation.
+5. Prt --- Turbulent Prandtl number. It should be defined for turbulent simulation.
    For conventional air, :math:`Prt=0.9`.
 
     `float`
@@ -149,6 +153,8 @@ Example::
     uf = %(mach)s
     pf = 1/%(gamma)s
     mu = %(rhof)s*%(uf)s*1/%(Re)s
+    TsTref = 110.4/288.15
+    CpTf = 1 / %(gamma)s
     nutf = 4*%(mu)s/%(rhof)s
 
 Solvers
@@ -190,6 +196,11 @@ Type of equations and spatial discretization schemes are configured as follows.
 
     ``rusanov`` | ``roem`` | ``hllem`` | ``ausmpw+`` | ``ausm+up``
 
+7. viscosity --- method to compute viscosity.
+   Default value is ``constant``.
+
+   ``constant`` | ``sutherland``
+
 Example::
 
     [solver]
@@ -198,7 +209,36 @@ Example::
     limiter = mlp-u2
     u2k = 5.0
     riemann-solver = ausmpw+
+    viscositu = sutherland
 
+[solver-viscosity-sutherland]
+*****************************
+Parameters related with Sutherland law are configured.
+Dimensional units are used to express all values.
+
+1. Tref --- reference temperature of the probelm
+
+    `float`
+
+2. Ts --- sutherland temperature. Default value is 110.4 K.
+
+    `float`
+
+3. c1 --- sutherland constant. Default value is $1.458\times 10^{-6}$.
+
+    `float`
+
+With these values, the reference viscosity is computed as:
+
+.. math::
+    \mu_{\infty} = \frac{C_1 T_{\infty}^{3/2}}{T_{\infty} + T_s}
+
+Example::
+
+    [solver-viscosity-sutherland]
+    Tref = 300
+    Ts = 110.4
+    c1 = 1.458e-6
 
 [solver-time-integrator]
 ************************
@@ -297,12 +337,33 @@ Example::
 Initial and Boundary Conditions
 --------------------------------
 Following sections configure initial and boundary conditions. 
-``pyBaram`` does not nondimensionalize the governing equations, 
-thus it is recommended to assign scaled variables 
-as initial and boundary conditions, as shown in following examples.
 The position variables (`x`, `y`, `z`) and 
 few numerical functions (:math:`\sin, \cos, \tanh, \exp, \sqrt {}`)
 and constant (:math:`\pi`) can be used.
+
+Non-dimensionlization
+*********************
+``pyBaram`` does not nondimensionalize the governing equations, 
+thus it is recommended to assign scaled variables 
+as initial and boundary conditions.
+
+The following approah is recommended.
+
+.. math::    
+    \rho^* = \frac{\rho}{\rho_{\infty}}, u^* = \frac{u}{a_{\infty}}, p^*=\frac{p}{\rho_{\infty} a_{\infty}^2}, T^*=\frac{T}{T_{\infty}}
+
+For free-stream, the non-dimensionalized values can be written as follows:
+
+.. math::
+    \rho^*_{\infty}=1, u^*_{\infty}=M_{\infty}, p^*_{\infty}=\frac{1}{\gamma}, T^*_{\infty}=1.
+
+The normalized viscosity :math:`\mu_{\infty}^*` is chosen to satisfiy Reynolds number. 
+The Sutherland law is computed as
+
+.. math::
+    \mu^* = \mu_{\infty}^* (T^*)^{3/2} \frac{1+T_s / T_{\infty}}{T^* + T_s / T_{\infty}}.
+
+Here the unit of :math:`T_s, T_{\infty}` is in Kelvin.
 
 [soln-ics]
 **********
@@ -317,10 +378,6 @@ Examples::
     p = pf
 
 In this, examples, ``rhof``, ``uf``, ``pf`` and ``aoa`` are assigned at ``[constants]`` section.
-As shown in the example of ``constants`` section, density and velocity is scaled by free-stream 
-density (:math:`\rho_{\infty}`) and speed of sound (:math:`a_{\infty}`), respectively. 
-Pressure is scaled by the product of density and square of speed of sound 
-(:math:`\rho_{\infty} a^2_{\infty}`).
 
 [soln-bcs-`name`]
 *****************
@@ -368,9 +425,7 @@ The details of type and required variables are summarized as follows.
 
     * ``p0`` --- total pressure
 
-    * ``t0`` --- total temperature
-
-    * ``R`` --- Gas constatnt
+    * ``Cpt0`` --- total enthalpy
 
     * ``dir`` --- velocity direction components.
 

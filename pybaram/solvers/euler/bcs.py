@@ -152,7 +152,7 @@ def make_bc_far(bcargs):
 def make_bc_sub_inptt(bcargs):
     nvars, ndims = bcargs['nfvars'], bcargs['ndims']
     gamma, pmin = bcargs['gamma'], bcargs['pmin']
-    p0, t0, R = bcargs['p0'], bcargs['t0'], bcargs['R']
+    p0, cpt0 = bcargs['p0'], bcargs['cpt0']
     nb = np.array(bcargs['dir'])
 
     def bc(ul, ur, nf):
@@ -179,10 +179,10 @@ def make_bc_sub_inptt(bcargs):
         u = -2*cb / (gamma-1) - rp
         mb = u / cb
         tratio = 1+(gamma-1)/2*mb**2
-        tb = t0 / tratio
+        cptb = cpt0 / tratio
         pb = p0 / tratio**(gamma/(gamma-1))
 
-        rhob = pb/R/tb
+        rhob = gamma/(gamma-1)*pb / cptb
         ur[0] = rhob
 
         for idx in range(ndims):
