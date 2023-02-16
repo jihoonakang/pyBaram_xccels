@@ -54,9 +54,13 @@ class ViscousFluidElements(FluidElements):
 
             def compute_mu(u):
                 rho, et = u[0], u[nfvars-1]
+                inv_rho = 1/rho
 
                 # Specific Enthalpy
-                CpT = max(gamma * (et / rho - 0.5*dot(u, u, ndims, 1, 1)), Hmin/rho)
+                CpT = max(
+                    gamma*inv_rho*(et - 0.5*inv_rho*dot(u, u, ndims, 1, 1)), 
+                    Hmin*inv_rho
+                )
                 
                 # Temperature ratio
                 Tratio = CpT / CpTf
