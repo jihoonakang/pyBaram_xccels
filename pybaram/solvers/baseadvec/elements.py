@@ -197,6 +197,11 @@ class BaseAdvecElements(BaseElements):
         if limiter == 'mlp-u2':
             is_u2 = True
             u2k = self.cfg.getfloat('solver', 'u2k', 5.0)
+
+            # Don't use ee2 for very small u2k
+            if u2k < eps:
+                is_u2 = False
+
             limf = self.be.compile(u2)
         else:
             is_u2 = False
