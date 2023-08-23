@@ -7,7 +7,7 @@ import functools as ft
 import numpy as np
 
 
-eps = np.finfo(np.float).eps
+eps = np.finfo(np.float64).eps
 
 
 def chop(fn):
