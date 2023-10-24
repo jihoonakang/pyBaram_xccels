@@ -3,7 +3,7 @@ pyBaram
 
 Overview
 ---------
-pyBaram is an open-source Python-based software to solve compresible flow using finite volume method on unstructured grids. Baram means the 'Wind' in Korean. It is designed to solve compressible inviscid flow, laminar flow and turbulent flow using RANS (Reynolds Averaged Navier-Stokes) models. All codes are written in Python and hybrid parallel simulations are employed using the high Performane Python packages.
+pyBaram is an open-source Python-based software to solve compressible flow using finite volume method on unstructured grids. Baram means the 'Wind' in Korean. It is designed to solve compressible inviscid flow, laminar flow, and turbulent flow using RANS (Reynolds Averaged Navier-Stokes) models. All codes are written in Python and hybrid parallel simulations are employed using the high Performance Python packages.
 
 Examples
 ---------
@@ -19,7 +19,7 @@ Examples of using pyBaram are available in the examples directory. Currently ava
 
 Documentation
 -------------
-Information on install, usage and implementation of pyBaram can be found in the [documentation](https://aadl_inha.gitlab.io/pyBaram/).
+Information on installation, usage, and implementation of pyBaram can be found in the [documentation](https://aadl_inha.gitlab.io/pyBaram/).
 
 Reference
 ---------
