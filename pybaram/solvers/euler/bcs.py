@@ -191,3 +191,23 @@ def make_bc_sub_inptt(bcargs):
         ur[nvars-1] = pb / (gamma-1) + 0.5*rhob*u**2
 
     return bc
+
+
+def make_bc_sub_outmdot(bcargs):
+    nvars, ndims = bcargs['nfvars'], bcargs['ndims']
+    gamma, mdot, pmin = bcargs['gamma'], bcargs['mdot'], bcargs['pmin']
+    nb = np.array(bcargs['dir'])
+
+    def bc(ul, ur, nf):
+        ur[0] = ul[0]
+        vel = mdot / ur[0]
+        pl = max((gamma - 1)*(ul[nvars-1] - 0.5 *
+                              dot(ul, ul, ndims, 1, 1)/ul[0]), pmin)
+
+        for idx in range(ndims):
+            ur[idx+1] = ur[0]*vel*nb[idx]
+
+        ur[nvars-1] = pl / (gamma-1) + 0.5*dot(ur, ur, ndims, 1, 1)/ur[0]
+
+    return bc
+

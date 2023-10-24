@@ -35,8 +35,8 @@ class NavierStokesIntInters(BaseAdvecDiffIntInters):
 
         def comm_flux(i_begin, i_end, gradf, *uf):
             for idx in range(i_begin, i_end):
-                fn = array((nfvars,))
-                um = array((nfvars,))
+                fn = array(nfvars)
+                um = array(nfvars)
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -95,8 +95,8 @@ class NavierStokesMPIInters(BaseAdvecDiffMPIInters):
 
         def comm_flux(i_begin, i_end, gradf, rhs, *uf):
             for idx in range(i_begin, i_end):
-                fn = array((nfvars,))
-                um = array((nfvars,))
+                fn = array(nfvars)
+                um = array(nfvars)
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -158,9 +158,9 @@ class NavierStokesBCInters(BaseAdvecDiffBCInters):
 
         def comm_flux(i_begin, i_end, gradf, *uf):
             for idx in range(i_begin, i_end):
-                ur = array((nfvars,))
-                um = array((nfvars,))
-                fn = array((nfvars,))
+                ur = array(nfvars)
+                um = array(nfvars)
+                fn = array(nfvars)
 
                 # Normal vector
                 nfi = nf[:, idx]

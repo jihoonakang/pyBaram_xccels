@@ -71,8 +71,8 @@ class BaseAdvecVertex(BaseVertex):
         for p, v in neivtx.items():
             # Make buffer
             n = len(v)
-            sbuf = np.empty((2, nvars, n), dtype=np.float)
-            rbuf = np.empty((2, nvars, n), dtype=np.float)
+            sbuf = np.empty((2, nvars, n), dtype=np.float64)
+            rbuf = np.empty((2, nvars, n), dtype=np.float64)
 
             sbufs.append(sbuf)
             rbufs.append(rbuf)

@@ -130,7 +130,7 @@ class RANSElements(BaseAdvecDiffElements):
                 sum_lamdf = 0.0
                 for jdx in range(nface):
                     # Wave speed abs(Vn) + c + max(4/3 \gamma)/rho/(mu/pr+mut/prt)/length
-                    lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1)) + c
+                    lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1))/rho + c
                     lamdf += (1/rho*max(4/3, gamma)*(mu[idx]/pr + mut[idx]/prt)*
                               smag[jdx, idx]/vol[idx])
                     sum_lamdf += lamdf*smag[jdx, idx]

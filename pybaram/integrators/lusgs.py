@@ -4,7 +4,7 @@ import numpy as np
 def make_diff_flux(nvars, dnv, fluxf, array):
     # Difference of flux vectors
     def _diff_flux(u, du, df, nf):
-        f = array((dnv,))
+        f = array(dnv)
         for i in range(nvars):
             du[i] += u[i]
 
@@ -97,9 +97,9 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
         for _idx in range(i_begin, i_end):
             idx = mapping[_idx]
 
-            du = array((nvars,))
-            dfj = array((dnv,))
-            df = array((dnv,))
+            du = array(nvars)
+            dfj = array(dnv)
+            df = array(dnv)
 
             for kdx in range(dnv):
                 df[kdx] = 0.0
@@ -134,9 +134,9 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
             # Upper sweep via mapping (reverse order)
             idx = mapping[_idx]
 
-            du = array((nvars,))
-            dfj = array((dnv,))
-            df = array((dnv,))
+            du = array(nvars)
+            dfj = array(dnv)
+            df = array(dnv)
 
             for kdx in range(dnv):
                 df[kdx] = 0.0
@@ -192,9 +192,9 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
             idx = icolor[_idx]
             curr_level = lcolor[idx]
 
-            du = array((nvars,))
-            dfj = array((dnv,))
-            df = array((dnv,))
+            du = array(nvars)
+            dfj = array(dnv)
+            df = array(dnv)
 
             for kdx in range(dnv):
                 df[kdx] = 0.0
@@ -233,9 +233,9 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
             idx = icolor[_idx]
             curr_level = lcolor[idx]
 
-            du = array((nvars,))
-            dfj = array((dnv,))
-            df = array((dnv,))
+            du = array(nvars)
+            dfj = array(dnv)
+            df = array(dnv)
 
             for kdx in range(dnv):
                 df[kdx] = 0.0
