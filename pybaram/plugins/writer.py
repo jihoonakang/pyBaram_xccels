@@ -71,7 +71,7 @@ class WriterPlugin(BasePlugin):
                     if p == 0:
                         loc_keys.append(key)
                     else:
-                        buf = np.empty(shape, dtype=np.float)
+                        buf = np.empty(shape, dtype=np.float64)
                         req = comm.Recv_init(buf, p, tag)
 
                         mpi_bufs.append(buf)
@@ -88,7 +88,7 @@ class WriterPlugin(BasePlugin):
                         if p == 0:
                             loc_keys.append(key)
                         else:
-                            buf = np.empty(shape, dtype=np.float)
+                            buf = np.empty(shape, dtype=np.float64)
                             req = comm.Recv_init(buf, p, tag)
 
                             mpi_bufs.append(buf)

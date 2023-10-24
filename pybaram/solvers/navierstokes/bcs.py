@@ -27,18 +27,23 @@ def make_bc_adia_wall(bcargs):
 def make_bc_isotherm_wall(bcargs):
     nvars, ndims = bcargs['nfvars'], bcargs['ndims']
     gamma = bcargs['gamma']
-    pmin = bcargs['pmin']
-
-    e = bcargs['cptw'] / gamma
-
+    pmin = bcargs['pmin']   
+    cptw = bcargs['cptw']
+    
     def bc(ul, ur, *args):
+        # Specific Enthalpy
         p = max((gamma - 1)*(ul[nvars-1] - 0.5 *
                              dot(ul, ul, ndims, 1, 1)/ul[0]), pmin)
-        ur[0] = p/e/(gamma-1)
+        
+        # Compute wall enthalpy
+        cptl = p/ul[0]/(gamma-1)*gamma
+        cptr = 2*cptw - cptl
+
+        ur[0] = gamma / (gamma-1)*p/cptr
 
         for idx in range(ndims):
-            ur[idx+1] = -ul[idx+1]
+            ur[idx+1] = -ul[idx+1]/ul[0]*ur[0]
 
-        ur[nvars-1] = ur[0]*e
+        ur[nvars-1] = ur[0]*cptr/gamma + 0.5*dot(ur, ur, ndims, 1, 1) / ur[0]
 
     return bc

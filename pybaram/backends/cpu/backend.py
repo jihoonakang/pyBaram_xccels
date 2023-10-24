@@ -51,9 +51,9 @@ class CPUBackend(Backend):
         np_dtype = np.float64
 
         @register_jitable(inline='always')
-        def stack_empty(shape, dtype=np_dtype):
-            arr_ptr=stack_empty_impl(shape[0], dtype)
-            arr=nb.carray(arr_ptr, shape)
+        def stack_empty(size, dtype=np_dtype):
+            arr_ptr=stack_empty_impl(size, dtype)
+            arr=nb.carray(arr_ptr, (size,))
             return arr
 
         return stack_empty

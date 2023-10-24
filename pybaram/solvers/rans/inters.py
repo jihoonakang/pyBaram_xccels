@@ -50,8 +50,8 @@ class RANSIntInters(BaseAdvecDiffIntInters):
 
         def comm_flux(i_begin, i_end, gradf, *uf):
             for idx in range(i_begin, i_end):
-                fn = array((nvars,))
-                um = array((nvars,))
+                fn = array(nvars)
+                um = array(nvars)
 
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
@@ -129,8 +129,8 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
 
         def comm_flux(i_begin, i_end, gradf, rhs, *uf):
             for idx in range(i_begin, i_end):
-                fn = array((nvars,))
-                um = array((nvars,))
+                fn = array(nvars)
+                um = array(nvars)
 
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]
@@ -210,7 +210,7 @@ class RANSBCInters(BaseAdvecDiffBCInters):
 
         def compute_delu(i_begin, i_end, *uf):
             for idx in range(i_begin, i_end):
-                ur = array((nvars,))
+                ur = array(nvars)
                 nfi = nf[:, idx]
 
                 lti, lfi, lei = lt[idx], lf[idx], le[idx]
@@ -261,9 +261,9 @@ class RANSBCInters(BaseAdvecDiffBCInters):
 
         def comm_flux(i_begin, i_end, gradf, *uf):
             for idx in range(i_begin, i_end):
-                fn = array((nvars,))
-                um = array((nvars,))
-                ur = array((nvars,))
+                fn = array(nvars)
+                um = array(nvars)
+                ur = array(nvars)
 
                 # Normal vector and wall distance (ydns)
                 nfi = nf[:, idx]

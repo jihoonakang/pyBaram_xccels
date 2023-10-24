@@ -201,13 +201,14 @@ class TVDRK3(BaseSteadyIntegrator):
 
         self.rhs()
         stages[0]()
+        self.sys.post(2)
 
         self.rhs(2, 1)
         stages[1]()
+        self.sys.post(2)
 
         resid = self.rhs(2, 1, is_norm=True)
         stages[2]()
-
         self.sys.post(0)
 
         return 0, resid
@@ -235,19 +236,22 @@ class FiveStageRK(BaseSteadyIntegrator):
 
         self.rhs()
         stages[0]
+        self.sys.post(2)
         
         self.rhs(2, 1)
         stages[1]()
+        self.sys.post(2)
 
         self.rhs(2, 1)
         stages[2]()
+        self.sys.post(2)
 
         self.rhs(2, 1)
         stages[3]()
+        self.sys.post(2)
 
         resid = self.rhs(2, 1, is_norm=True)
         stages[4]()
-
         self.sys.post(0)
 
         return 0, resid

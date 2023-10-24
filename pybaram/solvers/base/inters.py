@@ -166,7 +166,7 @@ class BaseMPIInters(BaseInters):
 
         nface, ndims = self.nfpts, self.ndims
         lt, le, lf = self._lidx
-        buf = np.empty((nface, ndims), dtype=np.float)
+        buf = np.empty((nface, ndims), dtype=np.float64)
 
         # Connecting vector from adjacent elements
         self._dx_adj = np.empty((ndims, nface))

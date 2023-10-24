@@ -147,13 +147,14 @@ class TVDRK3(BaseUnsteadyIntegrator):
 
         sys.rhside(t=t)
         stages[0](dt)
+        self.sys.post(2)
 
         sys.rhside(2, 1, t=t)
         stages[1](dt)
+        self.sys.post(2)
 
         sys.rhside(2, 1, t=t)
-        stages[2](dt)
-        
+        stages[2](dt)        
         self.sys.post(0)
 
         return 0

@@ -152,7 +152,7 @@ class EulerElements(BaseAdvecElements, FluidElements):
                 # Sum of Wave speed * surface area
                 sum_lamdf = 0.0
                 for jdx in range(nface):
-                    lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1)) + c
+                    lamdf = abs(dot(u[:, idx], svec[jdx, idx], ndims, 1))/rho + c
                     sum_lamdf += lamdf*smag[jdx, idx]
 
                 # Time step : CFL * vol / sum(lambda_f S_f)

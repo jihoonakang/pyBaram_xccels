@@ -34,14 +34,14 @@ class BaseElements:
         self._grad_method = cfg.get('solver', 'gradient', 'hybrid').lower()
 
         # Store neighboring element within current Elements
-        self.nei_ele = np.ones((nface, self.neles), dtype=np.int)*-1
+        self.nei_ele = np.ones((nface, self.neles), dtype=int)*-1
 
     def coloring(self):
         # Multi-Coloring
         #TODO: Check computing cost (pure python implementation)
-        color = np.zeros(self.neles, dtype=np.int)
+        color = np.zeros(self.neles, dtype=int)
         max_color = 1
-        is_colored = np.empty(32, dtype=np.int)
+        is_colored = np.empty(32, dtype=int)
 
         # Search Coloring (Search along hyperplane)
         xn = np.sum(self.xc, axis=1)
@@ -74,7 +74,7 @@ class BaseElements:
                 max_color += 1
                 color[idx] = max_color
 
-        ele_idx = np.arange(self.neles, dtype=np.int)
+        ele_idx = np.arange(self.neles, dtype=int)
 
         # Save colors as linked-list
         ncolor = np.cumsum([sum(color==i) for i in range(max_color+1)])
