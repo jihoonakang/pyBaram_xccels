@@ -30,7 +30,7 @@ class EulerIntInters(BaseAdvecIntInters):
 
         def comm_flux(i_begin, i_end, *uf):
             for idx in range(i_begin, i_end):
-                fn = array((nfvars,))
+                fn = array(nfvars)
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -75,7 +75,7 @@ class EulerMPIInters(BaseAdvecMPIInters):
 
         def comm_flux(i_begin, i_end, rhs, *uf):
             for idx in range(i_begin, i_end):
-                fn = array((nfvars,))
+                fn = array(nfvars)
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -124,8 +124,8 @@ class EulerBCInters(BaseAdvecBCInters):
 
         def bc_flux(i_begin, i_end, *uf):
             for idx in range(i_begin, i_end):
-                fn = array((nfvars,))
-                ur = array((nfvars,))
+                fn = array(nfvars)
+                ur = array(nfvars)
 
                 # Normal vector
                 nfi = nf[:, idx]
@@ -194,3 +194,11 @@ class EulerSubInpttBCInters(EulerBCInters):
         super().__init__(be, cfg, elemap, lhs, bctype)
 
         self._reqs = ['p0', 'cpt0', 'dir']
+
+
+class EulerSubOutMdotBCInters(EulerBCInters):
+    name = 'sub-outmdot'
+    _reqs = ['mdot', 'dir']
+
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs, bctype)
