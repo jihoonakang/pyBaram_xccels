@@ -27,7 +27,7 @@ class RANSSystem(BaseAdvecDiffSystem):
         self.iint = self.load_int_inters(msh, be, cfg, rank, elemap)
 
         # load bc
-        self.bint = bint = self.load_bc_inters(msh, be, cfg, rank, elemap)
+        self.bint = self.load_bc_inters(msh, be, cfg, rank, elemap)
 
         # load mpiint
         self.mpiint = self.load_mpi_inters(msh, be, cfg, rank, elemap)
@@ -65,12 +65,15 @@ class RANSSystem(BaseAdvecDiffSystem):
                 m = re.match(r'bcon_([a-z_\d]+)_p([\d]+)$', key)
 
                 if m:
-                    if m.group(0) not in is_loaded:
-                        bcsect = 'soln-bcs-{}'.format(m.group(1))
+                    # Collect boundary nodes
+                    bname = m.group(1)
+                    if bname not in is_loaded:
+                        is_loaded.append(bname)
+                        bcsect = 'soln-bcs-{}'.format(bname)
                         bctype = cfg.get(bcsect, 'type')
 
                         if bctype in ['adia-wall', 'isotherm-wall']:
-                            bnode.append(msh['bnode_' + m.group(1)][:,:self.ndims])
+                            bnode.append(msh['bnode_' + bname][:,:self.ndims])
             
             bnode = np.vstack(bnode)
         else:
