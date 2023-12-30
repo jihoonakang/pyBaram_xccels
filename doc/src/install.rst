@@ -45,7 +45,7 @@ Compile from source
 ===================
 You can install this code using ``setup.py``::
 
-    user@Compuer ~/pyBaram$ python setup.py install
+    user@Compuer ~/pyBaram$ pip install -e .
 
 It is recommended to use ``virtualenv`` or ``conda`` to create a separate environment.
 
@@ -76,3 +76,8 @@ For serial LU-SGS scheme for relaxation, `scipy.sparse` package is optionally re
 This reodering reduces the bandwidth of the implicit operation matrix. If `scipy` is not found, the same ordering as the mesh file is used.
 
 1. `scipy` >= 1.0
+
+For RANS computation, the distances from the wall boundary should be computed. `scipy.sparse` package is optionally requied to compute them more efficiently with `KDtree` search algorithm.
+If `scipy` is not found, it can be computed with brute-force manner.
+
+1. `scipy` >= 1.6

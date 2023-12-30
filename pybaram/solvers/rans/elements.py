@@ -48,6 +48,15 @@ class RANSElements(BaseAdvecDiffElements):
                                self.upts_in, self.mu, self.mut, self.dt)
 
     def _wall_distance(self, xw, wdist):
+        # Compute wall distance
+        try:
+            # KDtree version (require scipy)
+            self._wall_distance_kdtree(xw, wdist)
+        except:
+            # Brute-force version
+            self._wall_distance_bf(xw, wdist)
+
+    def _wall_distance_bf(self, xw, wdist):
         # Dimensions and constants
         nf, ne, nd = self.eles.shape
         nw = xw.shape[0]
@@ -85,6 +94,24 @@ class RANSElements(BaseAdvecDiffElements):
                 wdist[idx] = wd_ele
 
         self.be.make_loop(ne, _cal_wdist)(wdist)
+    
+    def _wall_distance_kdtree(self, xw, wdist):
+        from scipy.spatial import KDTree
+        
+        # Build Tree data
+        tree = KDTree(xw)
+
+        # Check multi-thread or not
+        if self.be.multithread == 'single':
+            workers = 1
+        else:
+            workers = -1
+
+        # Compute wall distance from KDtree
+        wdist[:] = np.average(tree.query(self.eles, workers=workers)[0], axis=0)
+        
+        # Delete tree
+        del(tree)
 
     def make_wave_speed(self):
         # Dimensions and constants

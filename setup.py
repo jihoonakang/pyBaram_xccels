@@ -37,6 +37,11 @@ install_requires = [
     'tqdm >= 4.0',
 ]
 
+# Optional dependencies
+extras_require = {
+    "scipy": ['scipy >= 1.6'],
+}
+
 # Scripts
 console_scripts = [
     'pybaram = pybaram.__main__:main'
@@ -55,4 +60,5 @@ setup(name='pybaram',
       data_files=data_files,
       entry_points={'console_scripts': console_scripts},
       install_requires=install_requires,
+      extras_require=extras_require,
       )
