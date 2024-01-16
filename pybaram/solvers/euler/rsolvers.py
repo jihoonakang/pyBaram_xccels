@@ -299,6 +299,10 @@ def make_rotated_roem(cplargs):
         b2v = min(0.0, min(contravav - aa, contravlv - aa))
         b1b2v = b1v*b2v / (b1v - b2v)
 
+        # Enforce upwind for supersonic
+        if b1b2 == 0:
+            b1b2v = 0
+
         abs_ma = np.abs(contravav*rcp_aa)
         rcp_aba_ma_p1 = 1 /(1.0 + abs_ma)
 
