@@ -7,20 +7,14 @@ Overview of Code Structure
 
 Start
 -----
-``pyBaram`` can be executed with the command `pybaram` which is linked to ``__main__.py``. 
-For `run` or `restart` modes, the command calls `process_common` in :mod:`pybaram.api.simulation`.
-Here, integrator object is initiated and `run` method is called to conduct simulation.
+``pyBaram`` can be executed using the command `pybaram` which is linked to ``__main__.py``. In `run` or `restart` modes, the command calls `process_common` in the :mod:`pybaram.api.simulation`. module. Here, the integrator object is initiated, and the run method is called to conduct the simulation.
 
 Integrators
 -----------
-Integrator object conducts time integration of the discretized equations.
-When ``integrator`` initiated, it invokes `system` class in the :mod:`pybaram.solvers` module to compute
-the right-hand side term of FVM. In addition, plugins are invoked 
-by this integrator object for post-processing.
-``pybaram`` can conduct both steady and unsteady simulations and they are implemented
-in :mod:`pybaram.integrators.steady` and :mod:`pybaram.integrators.unsteady`, respectively. 
-Here, `construct_stage` method generates the kernels for time integration.
-For unsteady simulation, explicit Runge-Kutta schemes can be applied, which is implemented as below.
+The Integrator object conducts time integration of the discretized equations. When the ``integrator`` is initiated, it invokes the `system` class in the :mod:`pybaram.solvers` module to compute the right-hand side term of the FVM. Additionally, plugins are invoked by this integrator object for post-processing.
+
+``pybaram`` can conduct both steady and unsteady simulations, and they are implemented
+in the :mod:`pybaram.integrators.steady` and the :mod:`pybaram.integrators.unsteady` modules, respectively. Here, the `construct_stage` method generates the kernels for time integration. For unsteady simulation, explicit Runge-Kutta schemes can be applied, as implemented below.
 
 .. admonition:: TVD-RK3
    :class: dropdown
@@ -33,8 +27,7 @@ For unsteady simulation, explicit Runge-Kutta schemes can be applied, which is i
 
 |
 
-For steady simulation, explicit Runge-Kutta schemes or 
-implicit LU-SGS schemes can be used, which is implemented as below.
+For steady simulation, either explicit Runge-Kutta schemes or implicit LU-SGS schemes can be used, as implemented below.
 
 .. admonition:: 5-stage Runge-Kutta
    :class: dropdown
@@ -76,18 +69,13 @@ The hierarchy of ``integrator`` class can be shown as below.
 
 Solvers
 -------
-In :mod:`pybaram.solvers` module, the governing equations and their spatial discretizations
-are implemented. For each submodule for governing equations, 
-there are ``system``, ``elements``, ``inters`` and ``vertex`` objects.
+In the :mod:`pybaram.solvers` module, the governing equations and their spatial discretizations are implemented. For each submodule corresponding to governing equations, there are objects such as  ``system``, ``elements``, ``inters`` and ``vertex``.
 
 System
 *******
-``system`` object, which is invoked from ``integrator``, initiates 
-``elements``, ``inters`` and ``vertex`` objects by reading mesh and restarted solution, if exited.
-These objects have `construct_kernels` method to generate kernels to compute right-hand side.
-Here, ``rhside`` method schedules these kernels. 
-For efficiency, non-blocking communications and computations are overlapped.
-The class hierarchy of ``system`` can be depicted as below.
+The ``system`` object, invoked from the ``integrator``,  initializes 
+``elements``, ``inters`` and ``vertex`` objects by reading mesh and restarted solution, if available. These objects have a `construct_kernels` method to generate kernels for computing the right-hand side. Here, the ``rhside`` method schedules these kernels. To enhance efficiency, non-blocking communications and computations are overlapped. 
+The class hierarchy of the ``system`` can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.ranskwsst.system
                          pybaram.solvers.ranssa.system
@@ -119,8 +107,7 @@ The class hierarchy of ``system`` can be depicted as below.
 
 Elements
 ********
-``elemenets`` object stores solution and other arrays. It also generates kernels, looping over elements.
-The class hierarchy can be depicted as below.
+The ``elemenets`` object stores solution and other arrays. It also generates kernels, looping over elements. The class hierarchy can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.navierstokes.elements
                          pybaram.solvers.euler.elements
@@ -141,7 +128,7 @@ The class hierarchy can be depicted as below.
 
 |
 
-For RANS simultion, class hierarchy can be depicted as below.
+For RANS simulation, class hierarchy can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.ranskwsst.elements
                          pybaram.solvers.ranssa.elements
@@ -161,9 +148,7 @@ For RANS simultion, class hierarchy can be depicted as below.
 
 Inters
 *******
-``inters`` objects generate kernels looping over interfaces.
-There are three interfaces; Internal, boundary and MPI interfaces.
-The abstract classes of them can be depicted as below.
+The ``inters`` objects generate kernels looping over interfaces. There are three types of interfaces: Internal, boundary, and MPI interfaces. The abstract classes for them can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.base.BaseIntInters
                          pybaram.solvers.base.BaseBCInters
@@ -181,7 +166,7 @@ The abstract classes of them can be depicted as below.
 
 |
 
-The class hierarchy of internal interfaces can be depicted as below.
+The class hierarchy of internal interfaces can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.ranskwsst.inters.RANSKWSSTIntInters
                          pybaram.solvers.ranssa.inters.RANSSAIntInters
@@ -204,7 +189,7 @@ The class hierarchy of internal interfaces can be depicted as below.
 
 * ``RANSKWSSTInters`` : kernel to compute turbulent flux for SST turbulence model
 
-The class hierarchy of physical boundary interfaces can be depicted as below.
+The class hierarchy of physical boundary interfaces can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.ranskwsst.inters.RANSKWSSTBCInters
                          pybaram.solvers.ranssa.inters.RANSSABCInters
@@ -213,10 +198,7 @@ The class hierarchy of physical boundary interfaces can be depicted as below.
     :top-classes: pybarm.solver.base.elements.BaseBCInters
     :parts: 1 
 
-The overall structure and role of these classes are the same as internal interfaces.
-The ``construct_bc`` method in ``BaseAdvecInters`` compiles boundary condition function and
-specific formulations are implemented in this class. 
-For example, the hierarchy of boundary conditions for Euler equations can be depicted as below.
+The overall structure and role of these classes are the same as internal interfaces. The  ``construct_bc`` method in ``BaseAdvecInters`` compiles the boundary condition function, and specific formulations are implemented in this class. For example, the hierarchy of boundary conditions for Euler equations can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.euler.inters.EulerSupOutBCInters
                          pybaram.solvers.euler.inters.EulerSlipWallBCInters
@@ -226,7 +208,7 @@ For example, the hierarchy of boundary conditions for Euler equations can be dep
     :top-classes: pybaram.solvers.euler.inters.EulerBCInters
     :parts: 1 
 
-The class hierarchy of MPI interfaces can be depicted as below.
+The class hierarchy of MPI interfaces can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.ranskwsst.inters.RANSKWSSTMPIInters
                          pybaram.solvers.ranssa.inters.RANSSAMPIInters
@@ -240,8 +222,7 @@ MPI communication kernels are defined in ``BaseAdvecMPIInters``.
 
 Vertex
 *******
-``vertex`` object generates kernel looping over vertex. 
-The class hierarchy can be depicted as below.
+The ``vertex`` object generates kernel looping over vertex. The class hierarchy can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.solvers.baseadvec.vertex
     :parts: 1 
@@ -252,8 +233,7 @@ The class hierarchy can be depicted as below.
 
 Plugins
 -------
-The ``plugin`` modules handle the post-processing after each iteration or a fixed number of iterations.
-The class hierarchy can be depicted as below.
+The ``plugin`` modules handle the post-processing after each iteration or a fixed number of iterations. The class hierarchy can be depicted as follows:
 
 .. inheritance-diagram:: pybaram.plugins.stats
                          pybaram.plugins.writer
@@ -272,28 +252,22 @@ The class hierarchy can be depicted as below.
 
 Backends
 --------
-:mod:`pybaram.backends` module accelerates the pure Python loop and manages the execution of kernels.
-Currently, only ``CPUBackend`` is implemented for serial and parallel computation using CPU.
-This module provides two features; generating kernel and data type for executions.
+The :mod:`pybaram.backends` module accelerates the pure Python loop and manages the execution of kernels. Currently, only the ``CPUBackend`` is implemented for serial and parallel computation using CPU. This module provides two main features; generating kernels and handling data types for executions.
 
 Compile Kernel
 **************
-In ``integrators`` and ``solvers`` modules, pure python functions are defined.
-They are compiled as kernel using loop generators in :mod:`pybaram.backends.cpu.loops`
-Numba JIT compiler is called and pure Python functions is compiled and 
-serial or parallel loop is constructed.
+In the ``integrators`` and the ``solvers`` modules, pure Python functions are defined. These functions are compiled as kernels using loop generators in the :mod:`pybaram.backends.cpu.loops` module. The Numba JIT compiler is then called, and the pure Python functions are compiled to construct serial or parallel loops.
 
 Data Types for Execution
 ************************
-Currently, four data types are defined in :mod:`pybaram.backends.types`.
+Currently, four data types are defined in the :mod:`pybaram.backends.types`.
 
 .. automodule:: pybaram.backends.types
     :members:
 
 Variables
 ----------
-The name of the variable `pyBaram` is somewhat condensed. 
-Below table summarizes mathematical symbol and meaning of the major arrays.
+The name of the variable ``pyBaram`` may seem somewhat condensed. The table below provides a summary of mathematical symbols and the corresponding meanings of major arrays:
 
 .. list-table:: Notation of Variables in `pyBaram`
    :widths: 15 15 45 25
@@ -343,32 +317,19 @@ Below table summarizes mathematical symbol and meaning of the major arrays.
 
 Code Snippets Analysis
 ======================
-Here, the ways to generate kernels and construct MPI communications are explained with 
-two sample code snippets.
+Here, the methods for generating kernels and constructing MPI communications are explained with two sample code snippets.
 
 Inviscid Flux Kernel
 --------------------
-There are two methods, ``make_serial_loop1d`` or ``make_parallel_loop1d``, in :mod:`pybaram.backends.cpu.loop` 
-and they generate an accelerated kernel from a Python function. 
-A function written in pure Python is compiled by a just-in-time compilation of Numba. 
-When ``make_parallel_loop1d`` is used, each thread parallelly executes the loop of this compiled function.
-Otherwise, the loop of the compiled function is executed sequentially.
+In :mod:`pybaram.backends.cpu.loop` module, there are two methods: ``make_serial_loop1d`` and ``make_parallel_loop1d``. These methods generate an accelerated kernel from a Python function. A function written in pure Python is compiled using just-in-time compilation with Numba. When ``make_parallel_loop1d`` is used, each thread parallelly executes the loop of this compiled function. Otherwise, the loop of the compiled function is executed sequentially.
 
 .. automodule:: pybaram.backends.cpu.loop
     :members:
     :undoc-members:
 
-As an example, ``comm_flux`` function is considered. 
-``EulerIntInters`` class in :mod:`pybaram.solvers.euler.inters` has ``_make_flux`` method, 
-which generates the kernel to compute numerical flux.
-The function ``comm_flux`` uses a plain for loop, 
-which is more similar to the loop structure of C/C++ or Fortran than a Pythonic-style one. 
-Therefore, one can readily adopt a well-developed function from legacy solver into `pyBaram`. 
-The allocation of local arrays was hoisted because of limited functionalities 
-for developing local static variables in Numba. 
-Furthermore, the ``_make_flux`` method passes this Python function 
-to the ``make_serial_loop1d`` or ``make_parallel_loop1d`` method of the backend object and 
-finally returns serialized or parallelized kernel, respectively.
+As an example, let's consider the ``comm_flux`` function. 
+The ``EulerIntInters`` class in the :mod:`pybaram.solvers.euler.inters` module has ``_make_flux`` method, which generates the kernel to compute numerical flux. The ``comm_flux`` function utilizes a plain for loop structure, which is more similar to the loop structure of C/C++ or Fortran than a Pythonic-style one. Therefore, one can readily adopt a well-developed function from a legacy solver into ``pyBaram``. 
+The allocation of local arrays was hoisted due to limited functionalities for developing local static variables in Numba. Furthermore, the ``_make_flux`` method passes this Python function to the ``make_serial_loop1d`` or ``make_parallel_loop1d`` method of the backend object and finally returns the serialized or parallelized kernel, respectively.
 
 .. autoclass:: pybaram.solvers.euler.inters.EulerIntInters
 
@@ -387,18 +348,9 @@ All arguments are parsed, then the compiled kernel is executed.
 
 Non-blocking Send/Receive 
 -------------------------
-``pyBaram`` exploits ``mpi4py`` package for MPI communication. 
-Non-blocking communications are used, and they are overlapped with computing kernels.
-In ``MPIInters`` class, these methods are implemented.
+``pyBaram`` exploits the ``mpi4py`` ppackage for MPI communication. Non-blocking communications are employed and overlapped with computing kernels. These methods are implemented in the ``MPIInters`` class.
 
-In `construct_kernels` method, non-blocking send and receive kernels and its request are 
-constructed by `_make_send` and `_make_recv` methods. The buffers are passed these methods
-and `_sendrecv` method is invoked. 
-In this method, `start` function is returned. 
-When this function is called with ``Queue`` instance in ``rhside``,
-the MPI request of this communication is registered in ``Queue`` instance and 
-start this non-blocking communication.
-This communication is finalized when `sync` method in ``Queue`` instance is called.
+In the `construct_kernels` method, non-blocking send and receive kernels, along with their requests, are constructed using the `_make_send` and `_make_recv` methods. Buffers are passed to these methods, and the `_sendrecv`` method is invoked. In this method, the `start` function is returned. When this function is called with a `Queue` instance in `rhside`, the MPI request for this communication is registered in the `Queue` instance, and the non-blocking communication starts. This communication is finalized when the `sync` method in the `Queue` instance is called.
 
 .. autoclass:: pybaram.solvers.baseadvec.inters.BaseAdvecMPIInters
 

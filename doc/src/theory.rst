@@ -82,10 +82,7 @@ where, :math:`C_p` is specific heat at constant pressure and :math:`k` is therma
 
 RANS Equations
 ---------------
-For RANS (Reynolds-averaged Navier-Stokes) equations, turbulent viscosity is computed by turbulent model equation.
-One equation `Spalart-Allmaras model <https://turbmodels.larc.nasa.gov/spalart.html#sa>`_ and
-Two equation `SST model <https://turbmodels.larc.nasa.gov/spalart.html#sst>`_ models are employed in ``pyBaram``.
-With turbulent viscosity :math:`\mu_t`, shear stress in viscous flux can be modified as follows.
+For RANS (Reynolds-averaged Navier-Stokes) equations, the turbulent viscosity is computed using turbulent model equation. ``pyBaram`` employs two models: the one equation `Spalart-Allmaras model <https://turbmodels.larc.nasa.gov/spalart.html#sa>`_ and the two equation `SST model <https://turbmodels.larc.nasa.gov/spalart.html#sst>`_. With turbulent viscosity :math:`\mu_t`, shear stress in viscous flux can be modified as follows:
 
 .. math::
    \tau_{xx} &=  2\frac{\mu+\mu_t}{\rho}(u_x - \frac{1}{3}(u_x + v_y + w_z)) \\
@@ -184,7 +181,9 @@ Each ``Inters`` class in :mod:`pybaram.solvers.euler.inters` computes convective
 * :math:`\Delta A_f, \vec{n}_f` are pre-computed and stored as `_mag_snorm` and `_vec_snorm` at ``BaseInters`` class in :mod:`pybaram.solvers.base.inters`. 
 * Various approximate Riemann solver :math:`H_c` are implemented in :mod:`pybaram.solvers.euler.rsolvers`. 
 
+    * Roe :cite:`Roe1997`
     * RoeM :cite:`Kim2003`
+    * Rotated-RoeM :cite:`Park2024`
     * AUSMPW+ :cite:`Kim2001`
     * AUSM+up :cite:`Liou2006`
     * HLLEM :cite:`Einfeldt1991`
@@ -218,10 +217,7 @@ Source terms are added after divergence of flux.
 
 Time Integrations
 ==================
-After computing right hand side (negative gradient of flux), the solution can be updated by integration over time.
-Currently, explicit Runge-Kutta schemes :cite:`Martinelli1988,Gottlieb1998` and 
-implicit LU-SGS schemes :cite:`Yoon1988` are implemented.
-The classes for these integrators are provided in :mod:`pybaram.integrators` module.
+After computing the right-hand side (negative gradient of flux), the solution can be updated through integration over time. Currently, explicit Runge-Kutta schemes :cite:`Martinelli1988,Gottlieb1998` and implicit LU-SGS schemes :cite:`Yoon1988` are implemented. The classes for these integrators are provided in the :mod:`pybaram.integrators` module.
 
 References
 ==========

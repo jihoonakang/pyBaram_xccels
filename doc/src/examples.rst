@@ -4,9 +4,7 @@ Examples
 
 Three-dimensional explosion problem
 ===================================
-This example is the extension of shock-tube problem to three-dimensional sphere. 
-The details of flow configuration can be found in `this paper <https://doi.org/10.1016/j.compfluid.2012.04.015>`_.
-Procedures to obtain unsteady solution can be presented as follows.
+This example is an extension of the shock-tube problem to a three-dimensional sphere. The details of the flow configuration can be found in `this paper <https://doi.org/10.1016/j.compfluid.2012.04.015>`_. The procedures to obtain an unsteady solution are presented as follows:
 
 1. Convert mesh::
 
@@ -37,10 +35,8 @@ Procedures to obtain unsteady solution can be presented as follows.
 
 Transonic flow over RAE2822 airfoil
 ===================================
-One of the famous benchmark to solve transonic flow over airfoil.
-The detail flow conditions can be obtained from `NPARC validation page <https://www.grc.nasa.gov/www/wind/valid/raetaf/raetaf.html>`_.
-The mesh file is obtained from `SU2 tutorial page <https://su2code.github.io/tutorials/Turbulent_2D_Constrained_RAE2822/>`_.
-Procedures to obtain steady-state solution are presented as follows.
+One of the famous benchmarks involves solving transonic flow over an airfoil. Detailed flow conditions can be obtained from the `NPARC validation page <https://www.grc.nasa.gov/www/wind/valid/raetaf/raetaf.html>`_.
+The mesh file is obtained from the `SU2 tutorial page <https://su2code.github.io/tutorials/Turbulent_2D_Constrained_RAE2822/>`_. The procedures to obtain a steady-state solution are presented as follows:
 
 1. Convert mesh::
 
@@ -67,12 +63,7 @@ Procedures to obtain steady-state solution are presented as follows.
 
 Transonic flow over ONERA M6 wing
 =================================
-This is famous benchmark to solve transonic flow over three-dimensional wing.
-The detail flow conditions can be obtained from `NASA Turbulence Modeling Resource <https://turbmodels.larc.nasa.gov/onerawingnumerics_val.html>`_.
-The mesh file is generated using the provided code from the same webpage and series of mixed mesh could be generated.
-You can download medium and fine mesh files from the link in examples folder.
-Since the provided mesh files are quite huge, it is recommended to run this case on the cluster machine.
-Procedures to obtain steady-state solution are presented as follows.
+This is a well-known benchmark for solving transonic flow over a three-dimensional wing. Detailed flow conditions can be obtained from the `NASA Turbulence Modeling Resource <https://turbmodels.larc.nasa.gov/onerawingnumerics_val.html>`_. The mesh file is generated using the provided code from the same webpage, allowing for the creation of a series of mixed meshes. You can download medium and fine mesh files from the link provided in the `examples` folder. Due to the substantial size of the provided mesh files, it is recommended to run this case on a cluster machine. The procedures to obtain a steady-state solution are presented as follows:
 
 1. Convert mesh::
 
@@ -103,11 +94,7 @@ Procedures to obtain steady-state solution are presented as follows.
 
 Supersonic flow over HB-2 model
 =================================
-The HB-2 model is a standard test case of axisymmetric body.
-The detail flow conditions and experimental data can be obtained from `AEDC technical report <https://apps.dtic.mil/sti/pdfs/AD0412651.pdf>`_.
-You can download the mesh file from the link in examples folder.
-Since the provided mesh file is quite huge, it is recommended to run this case on the cluster machine.
-Procedures to obtain steady-state solution are presented as follows.
+The HB-2 model is a standard test case for an axisymmetric body. Detailed flow conditions and experimental data can be obtained from the `AEDC technical report <https://apps.dtic.mil/sti/pdfs/AD0412651.pdf>`_. You can download the mesh file from the link provided in the `examples` folder. Due to the substantial size of the provided mesh file, it is recommended to run this case on a cluster machine. The procedures to obtain a steady-state solution are presented as follows:
 
 1. Convert mesh::
 

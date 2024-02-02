@@ -68,19 +68,12 @@ When you run ``pybaram``, following help output is given::
 
 Mesh File
 ---------
-``pyBaram`` can deal with unstructured mixed elements, however there are some cautions.
-Currently, only single unstructured zone can be solved.
-The volume and face should be properly labelled. 
-The volume label of single zone should be `fluid` and 
-faces for boundary condition should have distinct labels.
+``pyBaram`` can handle unstructured mixed elements; however, there are some cautions. Currently, only a single unstructured zone can be solved. It is important that volumes and faces are appropriately labeled. The volume label for a single zone should be set as fluid, and faces assigned for boundary conditions must have distinct labels.
 
 
 Configuration File
 ==================
-The parameters for ``pyBaram`` simulation are given in the configuration file.
-This file is written in INI file format and ``configparser`` module parses it.
-Followings describe the sections and details of parameters.
-
+The parameters for ``pyBaram`` simulation are specified in the configuration file. This file is written in the INI file format, and it is parsed using the ``configparser`` module. The following sections provide details on the sections and parameters.
 Backends
 ---------
 The backend section configures how to run ``pybaram``. 
@@ -343,11 +336,9 @@ and constant (:math:`\pi`) can be used.
 
 Non-dimensionlization
 *********************
-``pyBaram`` does not nondimensionalize the governing equations, 
-thus it is recommended to assign scaled variables 
-as initial and boundary conditions.
+``pyBaram`` does not non-dimensionalize the governing equations, so it is recommended to assign scaled variables for initial and boundary conditions. 
 
-The following approah is recommended.
+The following approach is recommended:
 
 .. math::    
     \rho^* = \frac{\rho}{\rho_{\infty}}, u^* = \frac{u}{a_{\infty}}, p^*=\frac{p}{\rho_{\infty} a_{\infty}^2}, T^*=\frac{T}{T_{\infty}}
@@ -449,15 +440,11 @@ Examples::
 
 Plugins
 --------
-Plugins are post-processing modules after iterations. 
-If a plugin is not configured, there is no post-processing.
-Following plugins can be configured.
+Plugins in ``pyBaram`` serve as post-processing modules after iterations. If a plugin is not configured, no post-processing will occur. The following plugins can be configured:
 
 [soln-plugin-stats]
 *******************
-Basic log file is written via this plugin. 
-For unsteady simulation, time and time step for each iteration is written.
-For steady simulation, residuals of all conservative variables are written.
+The `stats` plugin writes a fundamental log file. For unsteady simulations, it includes time and time step information for each iteration. In steady simulations, it records the residuals of all conservative variables.
 
 1. ``flushsteps`` --- flush to file for every `flushstep`. Default value is 500.
 
@@ -535,8 +522,7 @@ Examples::
 
 [soln-plugin-surface-`name`]
 ****************************
-This plugin integrates variables along the surface labelled as `name`. 
-This plugin gives both integrated values and averaged values
+This plugin integrates variables along the surface labeled as `name`. It provides both integrated and averaged values.
 
 1. ``iter-out`` --- compute forces for every `iter-out` for steady simulation
 
@@ -565,9 +551,7 @@ In this example, total pressure (:math:`p_0`) and mass flow rate (:math:`\dot{m}
 
 API
 ===
-pyBaram provides API to handle I/O and conduct simulation. 
-Currently, CLI (command line interface) functions are implemented only.
-The basic usage is described as follows.
+pyBaram provides an API for handling I/O and conducting simulations. Currently, only CLI (command line interface) functions are implemented. The basic usage is described as follows:
 
 .. automodule:: pybaram.api.io
     :members:
