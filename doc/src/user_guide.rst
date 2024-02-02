@@ -7,7 +7,7 @@ How to Run
 pyBaram provides a console script, which uses ``argparse`` module.
 When you run ``pybaram``, following help output is given::
 
-    user@Compuer ~/pyBaram$ pybaram
+    user@Computer ~/pyBaram$ pybaram
 
     usage: pybaram [-h] [--verbose] {import,partition,run,restart,export} ...
 
@@ -29,41 +29,41 @@ When you run ``pybaram``, following help output is given::
     
    Example::
 
-        user@Compuer ~/pyBaram$ pybaram import mesh.cgns mesh.pbrm
+        user@Computer ~/pyBaram$ pybaram import mesh.cgns mesh.pbrm
 
 2. ``pybaram partition`` --- Partition mesh file for MPI parallel computation.
    Currently, unsplitted mesh file can be partitioned.
     
    Example::
 
-        user@Compuer ~/pyBaram$ pybaram partition 2 mesh.pbrm mesh_p2.pbrm
+        user@Computer ~/pyBaram$ pybaram partition 2 mesh.pbrm mesh_p2.pbrm
 
 3. ``pybaram run`` --- Conduct flow simulation with a given mesh and configuration files (``.ini``).
 
    Example::
         
-        user@Compuer ~/pyBaram$ pybaram run mesh.pbrm conf.ini
+        user@Computer ~/pyBaram$ pybaram run mesh.pbrm conf.ini
 
    If you would like conduct MPI parallel computation, please use ``mpirun -n <cores>`` to launch ``pybaram`` script. 
    Note that the mesh file should be partitioned by the same number of cores.
 
    Example::
         
-        user@Compuer ~/pyBaram$ mpirun -np 2 pybaram run mesh_p2.pbrm conf.ini
+        user@Computer ~/pyBaram$ mpirun -np 2 pybaram run mesh_p2.pbrm conf.ini
 
 4. ``pybaram restart`` --- Restart flow simulation with a given mesh and solution files. 
    If you would like to restart with different methods, please append the configuration file.
 
    Example::
         
-        user@Compuer ~/pyBaram$ pybaram restart mesh.pbrm sol-100.pbrs
+        user@Computer ~/pyBaram$ pybaram restart mesh.pbrm sol-100.pbrs
 
 5. ``pybaram export`` --- Convert solution files to `VTK <https://vtk.org/>`_ unstructured file (``.vtu``) 
    or `Tecplot <https://www.tecplot.com/>`_ data file (``.plt``).
 
    Example::
         
-        user@Compuer ~/pyBaram$ pybaram export mesh.pbrm sol-100.pbrs out.vtu
+        user@Computer ~/pyBaram$ pybaram export mesh.pbrm sol-100.pbrs out.vtu
 
 
 Mesh File
@@ -194,7 +194,7 @@ Type of equations and spatial discretization schemes are configured as follows.
 
 6. riemann-solver --- scheme to compute inviscid flux at interface.
 
-    ``rusanov`` | ``roem`` | ``hllem`` | ``ausmpw+`` | ``ausm+up``
+    ``rusanov`` | ``roe`` | ``roem`` | ``rotated-roem`` | ``hllem`` | ``ausmpw+`` | ``ausm+up``
 
 7. viscosity --- method to compute viscosity.
    Default value is ``constant``.
@@ -224,7 +224,7 @@ Dimensional units are used to express all values.
 
     `float`
 
-3. c1 --- sutherland constant. Default value is $1.458\times 10^{-6}$.
+3. c1 --- sutherland constant. Default value is :math:`1.458\times 10^{-6}`.
 
     `float`
 

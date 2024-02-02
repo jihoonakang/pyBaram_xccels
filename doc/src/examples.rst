@@ -10,19 +10,19 @@ Procedures to obtain unsteady solution can be presented as follows.
 
 1. Convert mesh::
 
-    user@Compuer ~/pyBaram$ pybaram import explosion.cgns explosion.pbrm
+    user@Computer ~/pyBaram$ pybaram import explosion.cgns explosion.pbrm
 
 2. Partitioning mesh::
 
-    user@Compuer ~/pyBaram$ pybaram partition 4 explosion.pbrm explosion_p4.pbrm
+    user@Computer ~/pyBaram$ pybaram partition 4 explosion.pbrm explosion_p4.pbrm
 
 3. Running parallel simulation::
 
-    user@Compuer ~/pyBaram$ mpirun -n 4 pybaram run explosion_p4.pbrm explosion.ini
+    user@Computer ~/pyBaram$ mpirun -n 4 pybaram run explosion_p4.pbrm explosion.ini
 
 4. Convert VTK output file for visualization::
 
-    user@Compuer ~/pyBaram$ pybaram export explosion_p4.pbrm out-0.25.pbrs out.vtu
+    user@Computer ~/pyBaram$ pybaram export explosion_p4.pbrm out-0.25.pbrs out.vtu
 
 5. Visualizing the solution with Paraview, you can obtain following result.
 
@@ -44,15 +44,15 @@ Procedures to obtain steady-state solution are presented as follows.
 
 1. Convert mesh::
 
-    user@Compuer ~/pyBaram$ pybaram import rae2822.cgns rae2822.pbrm
+    user@Computer ~/pyBaram$ pybaram import rae2822.cgns rae2822.pbrm
 
 2. Running simulations::
 
-    user@Compuer ~/pyBaram$ pybaram run rae2822.pbrm rae2822.ini
+    user@Computer ~/pyBaram$ pybaram run rae2822.pbrm rae2822.ini
 
 3. Convert VTK output file for visualization::
 
-    user@Compuer ~/pyBaram$ pybaram export rae2822.pbrm out-10000.pbrs out.vtu
+    user@Computer ~/pyBaram$ pybaram export rae2822.pbrm out-10000.pbrs out.vtu
 
 4. Visualizing the solution with Paraview, you can obtain following result.
 
@@ -76,19 +76,19 @@ Procedures to obtain steady-state solution are presented as follows.
 
 1. Convert mesh::
 
-    user@Compuer ~/pyBaram$ pybaram import wing_mixed_ph.3.cgns wing_mixed_ph.3.pbrm
+    user@Computer ~/pyBaram$ pybaram import wing_mixed_ph.3.cgns wing_mixed_ph.3.pbrm
 
 2. Partitioning mesh::
 
-    user@Compuer ~/pyBaram$ pybaram partition 16 wing_mixed_ph.3.pbrm wing_mixed_ph.3_p16.pbrm
+    user@Computer ~/pyBaram$ pybaram partition 16 wing_mixed_ph.3.pbrm wing_mixed_ph.3_p16.pbrm
 
 3. Running parallel simulation::
 
-    user@Compuer ~/pyBaram$ mpirun -n 16 pybaram run wing_mixed_ph.3_p16.pbrm oneram6.ini
+    user@Computer ~/pyBaram$ mpirun -n 16 pybaram run wing_mixed_ph.3_p16.pbrm oneram6.ini
 
 4. Convert VTK output file for visualization::
 
-    user@Compuer ~/pyBaram$ pybaram export wing_mixed_ph.3_p16.pbrm out-20000.pbrs out.vtu
+    user@Computer ~/pyBaram$ pybaram export wing_mixed_ph.3_p16.pbrm out-20000.pbrs out.vtu
 
 5. Visualizing the solution with Paraview, you can obtain following result.
 
@@ -111,19 +111,19 @@ Procedures to obtain steady-state solution are presented as follows.
 
 1. Convert mesh::
 
-    user@Compuer ~/pyBaram$ pybaram import hb2.cgns hb2.pbrm
+    user@Computer ~/pyBaram$ pybaram import hb2.cgns hb2.pbrm
 
 2. Partitioning mesh::
 
-    user@Compuer ~/pyBaram$ pybaram partition 16 hb2.pbrm hb2_p16.pbrm
+    user@Computer ~/pyBaram$ pybaram partition 16 hb2.pbrm hb2_p16.pbrm
 
 3. Running parallel simulation::
 
-    user@Compuer ~/pyBaram$ mpirun -n 16 pybaram run hb2_p16.pbrm hb2.ini
+    user@Computer ~/pyBaram$ mpirun -n 16 pybaram run hb2_p16.pbrm hb2.ini
 
 4. Convert VTK output file for visualization::
 
-    user@Compuer ~/pyBaram$ pybaram export hb2_p16.pbrm out-5000.pbrs out.vtu
+    user@Computer ~/pyBaram$ pybaram export hb2_p16.pbrm out-5000.pbrs out.vtu
 
 5. Visualizing the solution with Paraview, you can obtain following result.
 

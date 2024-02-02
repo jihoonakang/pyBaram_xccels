@@ -28,24 +28,24 @@ With `Anaconda <https://www.anaconda.com/>`_ (or `Miniconda <https://docs.conda.
 
 1. Make a new environment and activate it::
 
-    user@Compuer ~/pyBaram$ conda create -n pyBaram
-    user@Compuer ~/pyBaram$ conda activate pybaram
+    user@Computer ~/pyBaram$ conda create -n pybaram
+    user@Computer ~/pyBaram$ conda activate pybaram
 
 2. Install Python packages::
 
-    user@Compuer ~/pyBaram$ conda install numpy numba h5py metis
-    user@Compuer ~/pyBaram$ conda install -c conda-forge mpi4py cgns
+    user@Computer ~/pyBaram$ conda install numpy numba h5py metis
+    user@Computer ~/pyBaram$ conda install -c conda-forge mpi4py cgns
 
 3. Obtain ``pyBaram`` release version from `release page <https://gitlab.com/aadl_inha/PyBaram/-/releases>`_ and install it::
 
-    user@Compuer ~/pyBaram$ pip install pybaram-0.X.Y-py3-none-any.whl
+    user@Computer ~/pyBaram$ pip install pybaram-0.X.Y-py3-none-any.whl
 
 
 Compile from source
 ===================
 You can install this code using ``setup.py``::
 
-    user@Compuer ~/pyBaram$ pip install -e .
+    user@Computer ~/pyBaram$ pip install -e .
 
 It is recommended to use ``virtualenv`` or ``conda`` to create a separate environment.
 
