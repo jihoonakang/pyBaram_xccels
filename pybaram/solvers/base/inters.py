@@ -59,7 +59,7 @@ class BaseIntInters(BaseInters):
             self._compute_dxc(*dxc)
 
         # Construct neighboring element within current Elements
-        self._compute_nei_ele(elemap)
+        self._construct_ele_graph(elemap, lhs, rhs)
 
     def _compute_dxc(self, *dx):
         nface, ndims = self.nfpts, self.ndims
@@ -87,21 +87,54 @@ class BaseIntInters(BaseInters):
         # Compute dx_adj
         self.be.make_loop(nface, compute_dxc)(self._dx_adj, *dx)
 
-    def _compute_nei_ele(self, elemap):
-        # List of nei_ele
-        nei_ele = [ele.nei_ele for ele in elemap.values()]
+    def _construct_ele_graph(self, elemap, lhs, rhs):
+        # Convert lhs, rhs list to numpy array
+        lhs = np.array(lhs, dtype='U4,i4,i1,i1')
+        rhs = np.array(rhs, dtype='U4,i4,i1,i1')
 
-        lt, le, lf = self._lidx
-        rt, re, rf = self._ridx
+        # Construct connectivity (fact to ele)
+        con = np.hstack([[lhs, rhs], [rhs, lhs]])[['f0', 'f1', 'f2']]
 
-        for idx in range(self.nfpts):
-            lti, lfi, lei = lt[idx], lf[idx], le[idx]
-            rti, rfi, rei = rt[idx], rf[idx], re[idx]
+        for t, ele in elemap.items():
+            mask = (con['f0'][0] == t) & (con['f0'][1] == t)
 
-            if rti == lti:
-                # If same Elements, save neigboring element
-                nei_ele[lti][lfi, lei] = rei
-                nei_ele[rti][rfi, rei] = lei
+            # Default nei_ele
+            ele.nei_ele = nei_ele = np.tile(
+                np.arange(ele.neles, dtype=int), ele.nface
+                ).reshape(ele.nface,-1)
+    
+            if np.any(mask):    
+                # Get local connectiviy for each element
+                lcon = con[:, mask]
+                
+                # Reorder w.r.t. left
+                idx = np.lexsort([lcon['f2'][0], lcon['f1'][0]])
+                l, r = lcon[:, idx]
+
+                # Get offset (address array)
+                tab = np.where(l['f1'][1:] != l['f1'][:-1])[0]
+                off = np.concatenate([[0], tab + 1, [len(l)]])
+                eidx = np.concatenate([
+                    [l['f1'][i1]]*(i2-i1) for (i1, i2) in zip(off[:-1], off[1:])
+                    ])
+                
+                # data
+                data = r['f1'].copy()
+
+                # Assign neighboring element array to each element
+                nei_ele[l['f2'], eidx] = data
+
+                # Rearrange indptr
+                ind = np.zeros(ele.neles, dtype=int)
+                ind[l['f1'][off[:-1]]] = np.diff(off)
+                indptr = np.concatenate([[0], np.cumsum(ind)])
+            else:                
+                # Null graph
+                indptr = np.zeros(ele.neles+1, dtype=int)
+                data = np.array([], dtype=int)
+
+            # Save as graph
+            ele.graph = {'indptr' : indptr, 'indices' : data}
 
 
 class BaseBCInters(BaseInters):

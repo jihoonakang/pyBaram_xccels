@@ -20,10 +20,11 @@ class METISPartition:
 
         # Update elements, connectivities, vertex and nodes
         newm.update(self.partition_elm(msh, eidx_g2l))
+        newm.update(self.partition_spt(msh, eidx_g2l))
         newm.update(self.partition_cons(msh, eidx_g2l))
         newm.update(self.partition_bcons(msh, eidx_g2l))
         newm.update(self.partition_vtx(msh, eidx_g2l))
-        self.copy_bnode(msh, newm)
+        self.copy_nodes(msh, newm)
 
         # Assign new UUID
         newm['mesh_uuid'] = np.array(str(uuid.uuid4()), dtype='S')
@@ -50,15 +51,6 @@ class METISPartition:
 
         # Make new mesh
         newmesh = defaultdict(list)
-
-        nodes = msh['node_p0']
-
-        # Define nmap
-        for rank in range(npart):
-            nmap = newmesh['nmap_p{}'.format(rank)] = np.unique(
-                np.concatenate([elm for elm, ep in zip(elms, epart) if ep == rank])
-            ).astype('i4')
-            newmesh['node_p{}'.format(rank)] = nodes[nmap - 1]
 
         # Global address
         egidx = [(n, i) for n in etypes for i in range(nele[n])]
@@ -110,6 +102,20 @@ class METISPartition:
             newelm['elm_{}_p{}'.format(t, p)].append(ele)
 
         return {k: np.array(v) for k, v in newelm.items()}
+    
+    def partition_spt(self, msh, eidx_g2l):
+        spts = {
+            n.split('_')[1]: msh[n] for n in msh if n.startswith('spt')
+        }
+
+        # Sort spt per rank
+        newelm = defaultdict(list)
+        for (t, g), (p, _) in eidx_g2l.items():
+            spt = spts[t][:, g]
+            newelm['spt_{}_p{}'.format(t, p)].append(spt)
+
+        arr = {k: np.array(v).swapaxes(0, 1) for k, v in newelm.items()}
+        return arr
 
     def partition_cons(self, msh, eidx_g2l):
         lhs, rhs = msh['con_p0'].astype('U4,i4,i1,i1').tolist()
@@ -186,7 +192,11 @@ class METISPartition:
 
         return new
 
-    def copy_bnode(self, msh, newm):
+    def copy_nodes(self, msh, newm):
+        # Copy nodes
+        newm['nodes'] = msh['nodes']
+
+        # Copy bnode
         for k in msh:
             if k.startswith('bnode'):
                 newm[k] = msh[k]

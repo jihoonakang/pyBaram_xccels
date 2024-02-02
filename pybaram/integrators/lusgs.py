@@ -57,7 +57,7 @@ def make_lusgs_common(ele, _lambdaf, factor=1.0):
                 lamf = _lambdaf(u, nf, dx, idx, mu, mut)
 
                 neib = nei_ele[jdx, idx]
-                if neib > 0:
+                if neib != idx:
                     u = uptsb[:, neib]
 
                     # Find maximum wave speed at face
@@ -109,7 +109,7 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
-                if neib > -1 and unmapping[neib] < _idx:
+                if unmapping[neib] < _idx:
                     u = uptsb[:, neib]
 
                     for kdx in range(nvars):
@@ -145,7 +145,7 @@ def make_serial_lusgs(be, ele, nv, mapping, unmapping, _flux):
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
-                if neib > -1 and unmapping[neib] > _idx:
+                if unmapping[neib] > _idx:
                     # Compute upper portion of off-diagonal
                     u = uptsb[:, neib]
 
@@ -204,22 +204,21 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
-                if neib > -1:
-                    if lcolor[neib] < curr_level:
-                    #if neib < idx:
-                        u = uptsb[:, neib]
+                if lcolor[neib] < curr_level:
+                #if neib < idx:
+                    u = uptsb[:, neib]
 
-                        for kdx in range(nvars):
-                            du[kdx] = 0.0
-                            
-                        for kdx in range(nv[0], nv[1]):
-                            du[kdx] = dub[kdx, neib]
+                    for kdx in range(nvars):
+                        du[kdx] = 0.0
+                        
+                    for kdx in range(nv[0], nv[1]):
+                        du[kdx] = dub[kdx, neib]
 
-                        _diff_flux(u, du, dfj, nf)
+                    _diff_flux(u, du, dfj, nf)
 
-                        for kdx in range(dnv):
-                            df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
-                                       * dub[kdx+nv[0], neib])*fnorm_vol[jdx, idx]
+                    for kdx in range(dnv):
+                        df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
+                                    * dub[kdx+nv[0], neib])*fnorm_vol[jdx, idx]
 
             for kdx in range(dnv):
                 # Gauss-Siedel Update residual with lower portion
@@ -245,21 +244,20 @@ def make_colored_lusgs(be, ele, nv, icolor, lcolor, _flux):
                 nf = vec_fnorm[jdx, :, idx]
 
                 neib = nei_ele[jdx, idx]
-                if neib > -1:
-                    if lcolor[neib] > curr_level:
-                        u = uptsb[:, neib]
+                if lcolor[neib] > curr_level:
+                    u = uptsb[:, neib]
+                    
+                    for kdx in range(nvars):
+                        du[kdx] = 0.0
                         
-                        for kdx in range(nvars):
-                            du[kdx] = 0.0
-                            
-                        for kdx in range(nv[0], nv[1]):
-                            du[kdx] = rhsb[kdx, neib]
+                    for kdx in range(nv[0], nv[1]):
+                        du[kdx] = rhsb[kdx, neib]
 
-                        _diff_flux(u, du, dfj, nf)
+                    _diff_flux(u, du, dfj, nf)
 
-                        for kdx in range(dnv):
-                            df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
-                                        * rhsb[kdx+nv[0], neib])*fnorm_vol[jdx, idx]
+                    for kdx in range(dnv):
+                        df[kdx] += (dfj[kdx] - lambdaf[jdx, idx]
+                                    * rhsb[kdx+nv[0], neib])*fnorm_vol[jdx, idx]
 
             for kdx in range(dnv):
                 # Gauss-Siedel Update residual with upper portion

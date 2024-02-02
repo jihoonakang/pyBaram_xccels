@@ -76,8 +76,8 @@ class ViscousFluidElements(FluidElements):
 
 
 class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
-    def __init__(self, be, cfg, name, eles, vcon):
-        super().__init__(be, cfg, name, eles, vcon)
+    def __init__(self, be, cfg, name, eles):
+        super().__init__(be, cfg, name, eles)
         self.nvars = len(self.primevars)
         self.nfvars = self.nvars
 
