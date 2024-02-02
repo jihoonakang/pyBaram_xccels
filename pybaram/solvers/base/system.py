@@ -8,18 +8,6 @@ from pybaram.utils.misc import ProxyList, subclass_by_name
 from pybaram.backends.types import Queue
 
 
-def get_spts(nodepts, etype, cell):
-    _etype_ndim = {'tri': 2, 'quad': 2,
-                   'tet': 3, 'hex': 3, 'pri': 3, 'pyr': 3}
-
-    ndim = _etype_ndim[etype]
-
-    # Get nodes and sort them
-    arr = np.array([[nodepts[i] for i in nn] for nn in cell])
-    arr = arr.swapaxes(0, 1)
-    return arr[..., :ndim]
-
-
 class BaseSystem:
     name = 'base'
     _elements_cls = BaseElements
@@ -74,22 +62,14 @@ class BaseSystem:
         eles = ProxyList()
 
         for key in msh:
-            m = re.match(r'elm_([a-z]*)_p{}$'.format(rank), key)
+            m = re.match(r'spt_([a-z]*)_p{}$'.format(rank), key)
 
             if m:
                 etype = m.group(1)
-                node = msh['node_p{}'.format(rank)]
-                nmap = msh['nmap_p{}'.format(rank)]
-                nodepts = dict(zip(nmap, node))
-                cons = msh[m.group(0)]
-                spts = get_spts(nodepts, etype, cons)
-
-                # Local vertex connectivity
-                vmap = dict(zip(nmap, np.arange(len(nmap))))
-                vcon = np.array([[vmap[i] for i in e] for e in cons])
+                spt = msh[m.group(0)]
 
                 # Load elements
-                ele = self._elements_cls(be, cfg, etype, spts, vcon)
+                ele = self._elements_cls(be, cfg, etype, spt)
                 elemap[etype] = ele
                 eles.append(ele)
 

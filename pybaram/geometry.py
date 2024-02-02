@@ -106,32 +106,38 @@ class QuadGeom(BaseGeom):
     name = 'quad'
     _face = [('line', [0, 1]), ('line', [1, 2]),
              ('line', [2, 3]), ('line', [3, 0])]
+    nvertex = 4
 
 
 class TriGeom(BaseGeom):
     name = 'tri'
     _face = [('line', [0, 1]), ('line', [1, 2]), ('line', [2, 0])]
+    nvertex = 3
 
 
 class TetGeom(BaseGeom):
     name = 'tet'
     _face = [('tri', [0, 2, 1]), ('tri', [0, 1, 3]),
              ('tri', [1, 2, 3]), ('tri', [2, 0, 3])]
+    nvertex = 4
 
 
 class HexGeom(BaseGeom):
     name = 'hex'
     _face = [('quad', [0, 3, 2, 1]), ('quad', [0, 1, 5, 4]), ('quad', [1, 2, 6, 5]),
              ('quad', [2, 3, 7, 6]), ('quad', [0, 4, 7, 3]), ('quad', [4, 5, 6, 7])]
+    nvertex = 8
 
 
 class PriGeom(BaseGeom):
     name = 'pri'
     _face = [('quad', [0, 1, 4, 3]), ('quad', [1, 2, 5, 4]), ('quad', [2, 0, 3, 5]),
              ('tri', [0, 2, 1]), ('tri', [3, 4, 5])]
+    nvertex = 6
 
 
 class PyrGeom(BaseGeom):
     name = 'pyr'
     _face = [('quad', [0, 3, 2, 1]),
              ('tri', [0, 1, 4]), ('tri', [1, 2, 4]), ('tri', [2, 3, 4]), ('tri', [3, 0, 4])]
+    nvertex = 5

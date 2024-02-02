@@ -44,20 +44,7 @@ class BaseWriter(object):
         self._soln, self.ndims = self._get_soln(soln, cfg)
 
     def _get_nodes(self, mesh):
-        ndict = {}
-        for k in mesh:
-            m = re.match('node_p(\d+)', k)
-            if m:
-                # Extract node_p, nmap_p
-                rank = m.group(1)
-                node_p = mesh['node_p{}'.format(rank)]
-                nmap_p = mesh['nmap_p{}'.format(rank)]
-
-                ndict.update({m: n for m, n in zip(nmap_p, node_p)})
-
-        # Reorder nodes
-        nodes = np.array([ndict[k] for k in sorted(ndict)])
-        return nodes
+        return mesh['nodes']
 
     def _get_cells(self, mesh):
         cells = defaultdict(list)

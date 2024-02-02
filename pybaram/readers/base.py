@@ -32,10 +32,6 @@ class BaseReader(object, metaclass=ABCMeta):
 
 
 class ConsAssembler(object):
-    # Dimensionality of each element type
-    _petype_ndim = {'tri': 2, 'quad': 2,
-                    'tet': 3, 'hex': 3, 'pri': 3, 'pyr': 3}
-
     # Face numberings for each element type
     _petype_fnums = {
         'tri': {'line': [0, 1, 2]},
@@ -224,6 +220,10 @@ class ConsAssembler(object):
 
 
 class NodesAssembler(object):
+    # Dimensionality of each element type
+    _petype_ndim = {'tri': 2, 'quad': 2,
+                    'tet': 3, 'hex': 3, 'pri': 3, 'pyr': 3}
+    
     def __init__(self, nodepts, elenodes, felespent, bfacespents, etype_map, scale):
         self._nodepts, self._elenodes = nodepts, elenodes
         self._bfacespents = {v: k for k, v in bfacespents.items()}
@@ -233,30 +233,44 @@ class NodesAssembler(object):
 
     def _fluid_elm(self):
         elm = {}
+        spt = {}
         bnode = defaultdict(list)
         for (etype, pent), ele in self._elenodes.items():
             petype = self._etype_map[etype][0]
 
             if pent == self._felespent:
                 elm['elm_{}_p0'.format(petype)] = ele
+                spt['spt_{}_p0'.format(petype)] = self._get_spt_ele(petype, ele)
             elif pent in self._bfacespents:
                 bname = self._bfacespents[pent]
                 bnode[bname].append(np.unique(ele.ravel()))
 
         bnode = {k : np.concatenate(v) for k, v in bnode.items()}
 
-        return elm, bnode
+        return elm, spt, bnode
 
     def get_nodes(self):
-        key = np.array(list(self._nodepts.keys()), dtype='i4')
         vals = np.array(list(self._nodepts.values()))*self._scale
 
-        ret = {'node_p0': vals, 'nmap_p0': key}
-        elm, bnode = self._fluid_elm()
+        ret = {'nodes': vals}
+        elm, spt, bnode = self._fluid_elm()
         ret.update(elm)
+        ret.update(spt)
         ret.update(self._extract_bnodes(bnode))
 
         return ret
 
+    def _get_spt_ele(self, petype, ele):
+        ndim = self._petype_ndim[petype]
+        nodepts = self._nodepts
+
+        # Get nodes and sort them
+        arr = np.array([[nodepts[i] for i in nn] for nn in ele])
+        arr = arr.swapaxes(0, 1)
+        return arr[..., :ndim]
+
     def _extract_bnodes(self, bnode):
-        return {'bnode_' + k : np.array([self._nodepts[e] for e in v]) for k, v in bnode.items()}
+        return {
+            'bnode_' + k : np.array([self._nodepts[e] for e in v]) 
+            for k, v in bnode.items()
+            }

@@ -9,13 +9,12 @@ from pybaram.utils.np import chop, npeval
 class BaseElements:
     name = 'base'
 
-    def __init__(self, be, cfg, name, eles, vcon):
+    def __init__(self, be, cfg, name, eles):
         # Argument save
         self.be = be
         self.cfg = cfg
         self.name = name
         self.eles = eles
-        self._vcon = vcon
 
         # Dimensions
         self.nvtx, self.neles, self.ndims = self.eles.shape
@@ -33,52 +32,39 @@ class BaseElements:
         # Gradient method
         self._grad_method = cfg.get('solver', 'gradient', 'hybrid').lower()
 
-        # Store neighboring element within current Elements
-        self.nei_ele = np.ones((nface, self.neles), dtype=int)*-1
-
     def coloring(self):
-        # Multi-Coloring
+        # Multi-Coloring (greedy)
         #TODO: Check computing cost (pure python implementation)
-        color = np.zeros(self.neles, dtype=int)
-        max_color = 1
-        is_colored = np.empty(32, dtype=int)
+        graph = self.graph
+        indptr  = graph['indptr']
+        indices = graph['indices']
 
-        # Search Coloring (Search along hyperplane)
+        degrees = np.diff(indptr)
         xn = np.sum(self.xc, axis=1)
-        for idx in np.argsort(xn):
-            # is_colored : check the color of neighboring cells
-            is_colored[:max_color+1] = 0
 
-            for jdx in range(self.nface):
-                # Seach neighboring cells, check color
-                nei = self.nei_ele[jdx, idx]
-                if nei > 0:
-                    nei_color = color[nei]
-                    is_colored[nei_color] = 1
-            
-            # Find minimum color which is not in neighboring cells
-            is_found = False
-            for k in range(1, max_color+1):
-                if is_colored[k] == 0:
-                    if not is_found:
-                        c = k
-                        is_found = True
-                    else:
-                        c = min(c, k)
+        color = np.zeros(self.neles, dtype=int)
+        avail_colors = set(range(1, max(degrees)+2))
+        nei_colors = np.empty(max(degrees)+1, dtype=int)
 
-            if is_found:
-                # Assign the minimum color if not exist
-                color[idx] = c
-            else:
-                # Increase color level and save it
-                max_color += 1
-                color[idx] = max_color
+        # Search Coloring (Search along hyperplane and max degrees)
+        for idx in np.lexsort([xn, -degrees]):
+            # Seach colors of neighboring cells
+            n = 0
+            for jdx in range(indptr[idx], indptr[idx+1]):                
+                nei = indices[jdx]
+                nei_color = color[nei]
 
-        ele_idx = np.arange(self.neles, dtype=int)
+                if nei_color > 0:
+                    nei_colors[n] = nei_color
+                    n += 1
+
+            # Find current color (greedy)
+            c = min(avail_colors - set(nei_colors[:n]))
+            color[idx] = c
 
         # Save colors as linked-list
-        ncolor = np.cumsum([sum(color==i) for i in range(max_color+1)])
-        icolor = np.concatenate([ele_idx[color==i] for i in range(max_color+1)])
+        ncolor = np.cumsum([sum(color==i) for i in range(color.max()+1)])
+        icolor = np.argsort(color)
         return ncolor, icolor, color
 
     def reordering(self):
@@ -87,15 +73,11 @@ class BaseElements:
             from scipy import sparse
             from scipy.sparse.csgraph import reverse_cuthill_mckee
 
-            # Convert nei_ele to csr sparse matrix
-            mask = self.nei_ele > 0
-            index = (np.ones(self.nface, dtype=int)[:, None]* np.arange(self.neles)[None, :])
-
-            col = np.concatenate([index[mask], np.arange(self.neles)])
-            row = np.concatenate([self.nei_ele[mask], np.arange(self.neles)])
-            data = np.ones_like(row)
-
-            mtx = sparse.csr_matrix((data, (row, col)), shape=(self.neles, self.neles))
+            # Convert graph to csr sparse matrix    
+            graph = self.graph
+            mtx = sparse.csr_matrix(
+                (np.ones_like(graph['indices']), graph['indices'], graph['indptr'])
+            )
 
             # reverse Cuthill MacKee reordering
             mapping = reverse_cuthill_mckee(mtx)

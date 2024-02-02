@@ -146,8 +146,8 @@ class RANSSAFluidElements(ViscousFluidElements):
 
 
 class RANSSAElements(RANSElements, RANSSAFluidElements):
-    def __init__(self, be, cfg, name, eles, vcon):
-        super().__init__(be, cfg, name, eles, vcon)
+    def __init__(self, be, cfg, name, eles):
+        super().__init__(be, cfg, name, eles)
 
         # SA Constants
         # See https://turbmodels.larc.nasa.gov/spalart.html#sa
