@@ -33,6 +33,41 @@ class BaseElements:
         self._grad_method = cfg.get('solver', 'gradient', 'hybrid').lower()
 
     def coloring(self):
+        try:
+            color = self._coloring_nx()
+        except:
+            color = self._coloring_greedy()
+
+         # Save colors as linked-list
+        ncolor = np.cumsum([sum(color==i) for i in range(color.max()+1)])
+        icolor = np.argsort(color)
+
+        return ncolor, icolor, color
+
+    def _coloring_nx(self):
+        from scipy import sparse
+        import networkx as nx
+
+        # Multi-Coloring (greedy)
+        graph = self.graph
+        indptr  = graph['indptr']
+        indices = graph['indices']
+
+        # Build adjacent array (CSR)
+        n = len(indptr) - 1
+        adj =sparse.csr_array((np.ones_like(indices), indices, indptr), shape=(n,n))
+
+        # Build graph
+        G = nx.from_scipy_sparse_array(adj)
+
+        # Greedy coloring
+        strategy = self.cfg.get('solver-time-integrator', 'coloring', 'largest_first')
+        col_dict = nx.greedy_color(G, strategy=strategy)
+        color = np.array([col_dict[k] for k in sorted(col_dict)]) + 1
+
+        return color        
+
+    def _coloring_greedy(self):
         # Multi-Coloring (greedy)
         #TODO: Check computing cost (pure python implementation)
         graph = self.graph
@@ -62,10 +97,7 @@ class BaseElements:
             c = min(avail_colors - set(nei_colors[:n]))
             color[idx] = c
 
-        # Save colors as linked-list
-        ncolor = np.cumsum([sum(color==i) for i in range(color.max()+1)])
-        icolor = np.argsort(color)
-        return ncolor, icolor, color
+        return color
 
     def reordering(self):
         try:
