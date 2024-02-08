@@ -206,9 +206,9 @@ class ConsAssembler(object):
 
         self._extract_pair_vtx_con(self._elenodes, pfacespents, vcon)
 
-        # Stack
-        vtx = np.hstack([np.array(list(vcon[k]), dtype='S4,i4,i1,i1')
-                         for k in sorted(vcon)])
+        # Flatten vtx
+        vtx = chain.from_iterable([vcon[k] for k in sorted(vcon)])
+        vtx = np.array(list(vtx), dtype='S4,i4,i1,i1')
 
         # Get address
         ivtx = np.cumsum([0] + [len(vcon[k]) for k in sorted(vcon)])
@@ -250,7 +250,7 @@ class NodesAssembler(object):
         return elm, spt, bnode
 
     def get_nodes(self):
-        vals = np.array(list(self._nodepts.values()))*self._scale
+        vals = self._nodepts[1:]*self._scale
 
         ret = {'nodes': vals}
         elm, spt, bnode = self._fluid_elm()
@@ -265,12 +265,8 @@ class NodesAssembler(object):
         nodepts = self._nodepts
 
         # Get nodes and sort them
-        arr = np.array([[nodepts[i] for i in nn] for nn in ele])
-        arr = arr.swapaxes(0, 1)
+        arr = nodepts[ele].swapaxes(0, 1)
         return arr[..., :ndim]
 
     def _extract_bnodes(self, bnode):
-        return {
-            'bnode_' + k : np.array([self._nodepts[e] for e in v]) 
-            for k, v in bnode.items()
-            }
+        return {'bnode_' + k : self._nodepts[v] for k, v in bnode.items()}
