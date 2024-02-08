@@ -122,8 +122,9 @@ class CGNSReader(BaseReader):
         # Read the single CGNS Zone
         zone = CGNSZoneReader(cgns, base, 0)
 
-        nodepts = {i + 1: v
-                   for i, v in enumerate(zone.nodepts.swapaxes(0, 1))}
+        ndims, nn = zone.nodepts.shape
+        nodepts = np.empty((nn+1, ndims))
+        nodepts[1:] = zone.nodepts.T
 
         elenodes = zone.elenodes
         pents = zone.pents

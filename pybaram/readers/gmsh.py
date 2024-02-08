@@ -185,21 +185,29 @@ class GMSHReader(BaseReader):
             raise ValueError('Expected $EndEntities')
 
     def _read_nodes(self, mshit):
-        self._read_nodes_impl(mshit)
+        nodes = self._read_nodes_impl(mshit)
+
+        self._nodepts = nodepts = np.empty((max(nodes.keys())+1, 3))
+        for k, v in nodes.items():
+            nodepts[k] = v
+
+        pass
 
     def _read_nodes_impl_v2(self, mshit):
-        self._nodepts = nodepts = {}
+        nodepts = {}
 
         # Read in the nodes as a dict
         for l in msh_section(mshit, 'Nodes'):
             nv = l.split()
             nodepts[int(nv[0])] = np.array([float(x) for x in nv[1:]])
 
+        return nodepts
+
     def _read_nodes_impl_v41(self, mshit):
         # Entity count, node count, minimum and maximum node numbers
         ne, nn, ixl, ixu = (int(i) for i in next(mshit).split())
 
-        self._nodepts = nodepts = {}
+        nodepts = {}
 
         for i in range(ne):
             nen = int(next(mshit).split()[-1])
@@ -210,6 +218,8 @@ class GMSHReader(BaseReader):
 
         if next(mshit) != '$EndNodes\n':
             raise ValueError('Expected $EndNodes')
+        
+        return nodepts
 
     def _read_eles(self, mshit):
         self._read_eles_impl(mshit)
