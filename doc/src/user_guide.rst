@@ -284,6 +284,11 @@ Time integration (or relaxation) schemes and related parameters are configured.
 
     `string`
 
+10. coloring --- the coloring strategy for colored LU-SGS scheme provided in `networkx.greedy_color` algorithm.
+    Default variable is `largest_first`.
+
+     `string`   
+
 Example for unsteady simulation::
 
     [solver-time-integrator]

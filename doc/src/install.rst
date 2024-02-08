@@ -67,10 +67,13 @@ If not, `Tecplot <https://www.tecplot.com/>`_ output file is written in ASCII fo
 
 1. `TecIO` == 2014
 
-For serial LU-SGS scheme for relaxation, `scipy.sparse` package is optionally required to re-order mesh with reverse Cuthill-McKee algorithm.
+For serial LU-SGS scheme, `scipy.sparse` package is optionally required to re-order mesh with reverse Cuthill-McKee algorithm.
 This reodering reduces the bandwidth of the implicit operation matrix. If `scipy` is not found, the same ordering as the mesh file is used.
 
 1. `scipy` >= 1.0
+
+For coloring LU-SGS scheme, `networkx` and `scipy.sparse` packages are optonally required to utilize greedy coloring algorithm in `netowrkx`.
+If these packages are not found, pure python greedy algorithm is used.
 
 For RANS computation, the distances from the wall boundary should be computed. `scipy.sparse` package is optionally requied to compute them more efficiently with `KDtree` search algorithm.
 If `scipy` is not found, it can be computed with brute-force manner.
