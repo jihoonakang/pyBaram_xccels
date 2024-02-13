@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from pybaram.backends import get_backend
 from pybaram.integrators import get_integrator
+from pybaram.utils.mpi import mpi_init
 
 from tqdm import tqdm
 
@@ -47,11 +48,9 @@ def restart(mesh, soln, cfg, be='none', comm='none'):
 
 
 def _common(msh, soln, cfg, backend, comm):
-    if comm == 'none':
-        from mpi4py import MPI
-        
+    if comm == 'none':        
         # Initiate MPI comm world
-        comm = MPI.COMM_WORLD
+        comm = mpi_init()
 
     # Get backend
     if backend == 'none':
