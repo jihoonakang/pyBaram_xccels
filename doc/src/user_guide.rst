@@ -476,7 +476,7 @@ Examples::
 
 [soln-plugin-force-`name`]
 **************************
-This plugin computes aerodynamic force coefficients along surface labelled `name`.
+This plugin computes aerodynamic force and moment coefficients along surface labelled `name`.
 
 1. ``iter-out`` --- compute forces for every `iter-out` for steady simulation
 
@@ -503,14 +503,30 @@ This plugin computes aerodynamic force coefficients along surface labelled `name
 
     `float`
 
-7. ``dir-name`` --- each character (subscript) denote direction and its direction will be configured.
+7. ``length`` --- reference length to compute aerodynamic coefficients
+
+    `float`
+
+8. ``force-dir-name`` --- each character (subscript) denote force direction and its direction will be configured.
 
     `characters`
 
-8. ``dir-`` `character` --- component of direction vector of each subscript `character`. 
+9. ``force-dir-`` `character` --- component of force direction vector of each subscript `character`. 
    The dimension of this vector should same as the dimension of space.
 
-    `float` , `float`, ( `float` )
+    `float`, `float`, ( `float` )
+
+10. ``moment-center`` --- reference position to compute aerodynamic moment.
+
+    `float`, `float`, ( `float` )
+
+11. ``moment-dir-name`` --- each character (subscript) denote moment direction and its direction will be configured.
+
+    `characters`
+
+12. ``moment-dir-`` `character` --- component of moment direction vector of each subscript character. For two-dimensional computation, it is a scalar to indicate whether it is clockwise (-1) or counterclockwise (1). For three-dimensional computation, this vector should have the same dimension as the space.
+
+    `float`, `float`, `float`
 
 Examples::
 
@@ -520,9 +536,13 @@ Examples::
     vel = uf
     p = pf
     area = 1.0
-    dir-name = ld
-    dir-l = -sin(aoa/180*pi), cos(aoa/180*pi)
-    dir-d = cos(aoa/180*pi), sin(aoa/180*pi)
+    length = 1.0
+    force-dir-name = ld
+    force-dir-l = -sin(aoa/180*pi), cos(aoa/180*pi)
+    force-dir-d = cos(aoa/180*pi), sin(aoa/180*pi)
+    moment-center = 0.25, 0
+    moment-dir-name = z
+    moment-dir-z = -1
 
 
 [soln-plugin-surface-`name`]

@@ -19,7 +19,7 @@ Examples of using pyBaram are available in the examples directory. Currently ava
 
 Documentation
 -------------
-Information on the installation, usage, and implementation of pyBaram can be found in the[documentation](https://aadl_inha.gitlab.io/pyBaram/).
+Information on the installation, usage, and implementation of pyBaram can be found in the [documentation](https://aadl_inha.gitlab.io/pyBaram/).
 
 Reference
 ---------
