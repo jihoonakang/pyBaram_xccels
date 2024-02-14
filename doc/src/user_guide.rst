@@ -287,7 +287,10 @@ Time integration (or relaxation) schemes and related parameters are configured.
 10. coloring --- the coloring strategy for colored LU-SGS scheme provided in `networkx.greedy_color` algorithm.
     Default variable is `largest_first`.
 
-     `string`   
+     `string`
+
+11. turb-cfl-factor --- The factor of the ``cfl`` number for turbulent equations with respect to that of flow equations. 
+    It adjusts the pseudo time for turbulence equations to alleviate numerical difficulties. The default value is 1.0.
 
 Example for unsteady simulation::
 

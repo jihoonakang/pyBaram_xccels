@@ -65,8 +65,8 @@ class BaseUnsteadyIntegrator(BaseIntegrator):
             f"def stage(i_begin, i_end, dt, *upts):\n"
             f"  for idx in range(i_begin, i_end):\n"
             f"      for j in range(nvars):\n"
+            f"          upts[{out}][j, idx] = {eq_str}"
         )
-        f_txt += "          upts[{}][j, idx] = {}".format(out, eq_str)
 
         kernels = []
         for ele in self.sys.eles:
