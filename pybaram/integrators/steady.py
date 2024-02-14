@@ -53,6 +53,15 @@ class BaseSteadyIntegrator(BaseIntegrator):
         else:
             self._dcfl = 0
 
+        # For turbulent simulation
+        if self.sys.name.startswith('rans'):
+            self._is_turb = True
+
+            # Get turbulent CFL factor
+            self._tcfl_fac = cfg.getfloat('solver-time-integrator', 'turb-cfl-factor', 1.0)
+        else:
+            self._is_turb = False
+
         # Specify residual variable for monitoring
         ele = next(iter(self.sys.eles))
         self.conservars = conservars = ele.conservars
@@ -107,16 +116,31 @@ class BaseSteadyIntegrator(BaseIntegrator):
         # Generate formulation of each RK stage 
         eq_str = '+'.join('{}*upts[{}][j, idx]'.format(a, i) for a, i in zip(args[::2], args[1::2]))
 
-        # Substitute 'dt' string as dt array
-        eq_str = re.sub('dt', 'dt[idx]', eq_str)
+        if self._is_turb:
+            # Substitute 'dt' string as dt array
+            eqf_str = re.sub('dt', 'dt[idx]', eq_str)
+            eqt_str = re.sub('dt', '{}*dt[idx]'.format(self._tcfl_fac), eq_str)
 
-        # Generate Python function for each RK stage
-        f_txt =(
-            f"def stage(i_begin, i_end, dt, *upts):\n"
-            f"  for idx in range(i_begin, i_end):\n"
-            f"      for j in range(nvars):\n"
-        )
-        f_txt += "          upts[{}][j, idx] = {}".format(out, eq_str)
+            # Generate Python function for each RK stage
+            f_txt =(
+                f"def stage(i_begin, i_end, dt, *upts):\n"
+                f"  for idx in range(i_begin, i_end):\n"
+                f"      for j in range(nfvars):\n"
+                f"          upts[{out}][j, idx] = {eqf_str}\n"
+                f"      for j in range(nfvars, nvars):\n"
+                f"          upts[{out}][j, idx] = {eqt_str}"
+            )
+        else:
+            # Substitute 'dt' string as dt array
+            eq_str = re.sub('dt', 'dt[idx]', eq_str)
+
+            # Generate Python function for each RK stage
+            f_txt =(
+                f"def stage(i_begin, i_end, dt, *upts):\n"
+                f"  for idx in range(i_begin, i_end):\n"
+                f"      for j in range(nvars):\n"
+                f"          upts[{out}][j, idx] = {eq_str}"
+            )
 
         kernels = []
         for ele in self.sys.eles:
@@ -305,14 +329,14 @@ class LUSGS(BaseSteadyIntegrator):
             kernels = [pre_lusgs, lsweeps, usweeps]
 
             # LU-SGS for turbulent variables
-            if hasattr(ele, 'mut'):
+            if self._is_turb:
                 # Get Python function of flux and wave speed for turbulent variables
                 _tflux = ele.tflux_container()
                 _tlambdaf = ele.make_turb_wave_speed()
                 tnv = (ele.nfvars, ele.nvars)
 
                 # Compile LU-SGS functions for turbulent variables
-                _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=1.0)
+                _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=self._tcfl_fac)
                 _tlsweep, _tusweep = make_serial_lusgs(
                     be, ele, tnv, mapping, unmapping, _tflux
                 )
@@ -377,7 +401,7 @@ class ColoredLUSGS(BaseSteadyIntegrator):
 
             # Compile LU-SGS functions
             _update = make_lusgs_update(ele)
-            _pre_lusgs = make_lusgs_common(ele, _lambdaf, factor=1.0)
+            _pre_lusgs = make_lusgs_common(ele, _lambdaf)
             _lsweep, _usweep = make_colored_lusgs(
                 be, ele, nv, icolor, lev_color, _flux
             )
@@ -405,14 +429,14 @@ class ColoredLUSGS(BaseSteadyIntegrator):
             kernels = [pre_lusgs, *lsweeps, *usweeps]
 
             # LU-SGS for turbulent variables
-            if hasattr(ele, 'mut'):
+            if self._is_turb:
                 # Get Python function of flux and wave speed for turbulent variables
                 _tflux = ele.tflux_container()
                 _tlambdaf = ele.make_turb_wave_speed()
                 tnv = (ele.nfvars, ele.nvars)
 
                 # Compile LU-SGS functions for turbulent variables
-                _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=1.0)
+                _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=self._tcfl_fac)
                 _tlsweep, _tusweep = make_colored_lusgs(
                     be, ele, tnv, icolor, lev_color, _tflux
                 )
