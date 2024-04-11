@@ -65,20 +65,20 @@ Viscous flux of Navier-Stokes equations are written as follows.
 where, :math:`\tau` is shear stress, which can be written as follows.
 
 .. math::
-   \tau_{xx} &=  2\frac{\mu}{\rho}(u_x - \frac{1}{3}(u_x + v_y + w_z)) \\
-   \tau_{xy} &= \frac{\mu}{\rho}(v_x + u_y)
+   \tau_{xx} &=  2\mu(u_x - \frac{1}{3}(u_x + v_y + w_z)) \\
+   \tau_{xy} &= \mu(v_x + u_y)
 
 :math:`\mu`` is viscosity and :math:`u_x` is derivative of velocity. :math:`\Theta` can be written as follows.
 
 .. math::
-   \Theta_x = u \tau_{xx} + v \tau_{xy} + w \tau_{xz} + \frac{\gamma\mu}{Pr} T_x
+   \Theta_x = u \tau_{xx} + v \tau_{xy} + w \tau_{xz} + \frac{\gamma\mu C_v}{Pr} T_x
 
 where, :math:`T` is temperature and :math:`Pr` is Prandtl number, which is a non-dimensionalized value.
 
 .. math::
-    Pr = \frac{\mu C_p}{k}
+    Pr = \frac{\mu C_p}{k} = \frac{\gamma\mu C_v}{k}
 
-where, :math:`C_p` is specific heat at constant pressure and :math:`k` is thermal conductivity.
+where, :math:`C_p` is specific heat at constant pressure, :math:`C_v` is specific heat at constant volume and :math:`k` is thermal conductivity.
 
 RANS Equations
 ---------------

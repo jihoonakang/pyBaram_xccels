@@ -3,6 +3,7 @@ import numpy as np
 import re
 
 from pybaram.solvers.base import BaseElements
+from pybaram.solvers.euler.jacobian import make_convective_jacobian
 from pybaram.backends.types import ArrayBank, Kernel, NullKernel
 from pybaram.utils.np import eps
 
@@ -254,3 +255,12 @@ class BaseAdvecElements(BaseElements):
                 _fix_nonPys(upts[:, idx])
 
         return self.be.make_loop(self.neles, post)
+
+    def make_jacobian(self, sign, vistype=None):
+        cplargs = {
+            'ndims': self.ndims,
+            'gamma': self._const['gamma'],
+            'to_prim': self.to_flow_primevars()
+        }
+
+        return make_convective_jacobian(self.be, cplargs, sign)

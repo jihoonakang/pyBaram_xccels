@@ -221,3 +221,43 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
             return abs(contra) + 1/dx*(mu[idx] + mut[idx])/rho/sigma
 
         return self.be.compile(_lambdaf)
+
+    def make_turb_jacobian(self):
+        from pybaram.solvers.ranskwsst.turbulent import make_blendingF1
+
+        cplargs = {'ndims': self.ndims, 'nvars': self.nvars, **self._turb_coeffs}
+        nvars = self.nvars
+        betast = self._turb_coeffs['betast']
+        sigmak1 = self._turb_coeffs['sigmak1']
+        sigmak2 = self._turb_coeffs['sigmak2']
+        sigmaw1 = self._turb_coeffs['sigmaw1']
+        sigmaw2 = self._turb_coeffs['sigmaw2']
+
+        dsrc = self.dsrc
+        d = self.ydist
+        _f1 = make_blendingF1(self.be, cplargs)
+        
+        # Compute turbulence Jacobian
+        def _jacobian(uf, nf, A, gf, idx, mu, dx, mut):
+            mui, muti, di = mu[idx], mut[idx], d[idx]
+            f1 = _f1(uf, gf, mui, di)
+            sigk = f1*sigmak1 + (1-f1)*sigmak2
+            sigw = f1*sigmaw1 + (1-f1)*sigmaw2
+            rho = uf[0]
+
+            A[0][0] = (mui + sigk*muti)/rho
+            A[0][1] = 0.0
+            A[1][0] = 0.0
+            A[1][1] = (mui + sigw*muti)/rho
+
+        # Compute Jacobian of source term
+        def _dsrc(A, idx, uf):
+            rho = uf[0]
+            k = uf[nvars-2]/rho
+
+            A[0][0] = dsrc[nvars-2][idx]
+            A[0][1] = betast*k
+            A[1][0] = 0.0
+            A[1][1] = dsrc[nvars-1][idx]
+
+        return self.be.compile(_jacobian), self.be.compile(_dsrc)
