@@ -58,3 +58,13 @@ class CPUBackend(Backend):
 
         return stack_empty
 
+    def local_matrix(self):
+        np_dtype = np.float64
+
+        @register_jitable
+        def stack_empty(size, shape, dtype=np_dtype):
+            arr_ptr = stack_empty_impl(size, dtype)
+            arr = nb.carray(arr_ptr, shape)
+            return arr
+        
+        return stack_empty

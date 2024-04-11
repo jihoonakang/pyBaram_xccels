@@ -73,6 +73,7 @@ class BaseSteadyIntegrator(BaseIntegrator):
         self.vol = comm.allreduce(voli, op=MPI.SUM)
 
         # Construct kernels
+        self.cfg = cfg
         self.construct_stages()
 
     @property
@@ -480,9 +481,109 @@ class ColoredLUSGS(BaseSteadyIntegrator):
 
         return 0, resid
 
+
+class BlockJacobi(BaseSteadyIntegrator):
+    name = 'jacobi'
+    nreg = 4
+
+    def construct_stages(self):
+        from pybaram.integrators.jacobi import make_jacobi_update, make_jacobi_sweep, make_jacobi_common
+
+        # Constants for Jacobi method
+        self.subiter = self.cfg.getint('solver-time-integrator', 'sub-iter', 10)
+        self.subtol = self.cfg.getfloat('solver-time-integrator', 'sub-tol', 0.005)
+        vistype = self.cfg.get('solver-time-integrator', 'visflux-jacobian', 'tlns')
+
+        be = self.be
+
+        for ele in self.sys.eles:
+            # Temporal arrays
+            diag = np.empty((ele.nfvars, ele.nfvars, ele.neles))
+            ele.subres = np.empty((ele.neles,))
             
+            # Get viscosity if exists
+            mu = ele.mu if hasattr(ele, 'mu') else None
+            mut = ele.mut if hasattr(ele, 'mut') else None
 
+            # Jacobian matrix function
+            _pos_jacobian = ele.make_jacobian('positive', vistype)
+            _neg_jacobian = ele.make_jacobian('negative', vistype)
+            nv = (0, ele.nfvars)
 
+            # Diagonal matrix computation kernel
+            _pre_jacobi = make_jacobi_common(be, ele, nv, _pos_jacobian)
+            pre_jacobi = Kernel(be.make_loop(ele.neles, _pre_jacobi),
+                                ele.upts[0], ele.dt, diag, mu, mut)
+            
+            # Sweep and compute subiteration step solution
+            _sweep, _compute = make_jacobi_sweep(be, ele, nv, _neg_jacobian)
+            sweep = Kernel(be.make_loop(ele.neles, _sweep),
+                               ele.upts[0], ele.upts[1], ele.upts[2], ele.upts[3], mu, mut)
+            compute = Kernel(be.make_loop(ele.neles, _compute),
+                                 ele.upts[2], ele.upts[3], diag, ele.subres)
+            
+            main_kernels = [sweep, compute]
+            
+            if self._is_turb:
+                tdiag = np.empty((ele.nturbvars, ele.nturbvars, ele.neles))
+                tnv = (ele.nfvars, ele.nvars)
 
-             
+                _tjacobian, _srcjacobian = ele.make_turb_jacobian()
 
+                _pre_tjacobi = make_jacobi_common(be, ele, tnv, _tjacobian, _dsrc=_srcjacobian)
+                pre_tjacobi = Kernel(be.make_loop(ele.neles, _pre_tjacobi),
+                                     ele.upts[0], ele.dt, tdiag, mu, mut)
+                
+                # Turbulent sweeps and compute kernel
+                _tsweep, _tcompute = make_jacobi_sweep(be, ele, tnv, _tjacobian)
+                tsweep = Kernel(be.make_loop(ele.neles, _tsweep),
+                                ele.upts[0], ele.upts[1], ele.upts[2], ele.upts[3], mu, mut)
+                tcompute = Kernel(be.make_loop(ele.neles, _tcompute),
+                                  ele.upts[2], ele.upts[3], tdiag)
+                
+                main_kernels += [tsweep, tcompute]
+                pre_kernels = [pre_jacobi, pre_tjacobi]
+                ele.pre_jacobi = MetaKernel(pre_kernels)
+
+            else:
+                ele.pre_jacobi = pre_jacobi
+            
+            # Collect kernels and make meta kernels
+            ele.jacobi = MetaKernel(main_kernels)
+
+            # Update kernel
+            unv = (0, ele.nvars)
+            _update = make_jacobi_update(unv)
+            ele.update = Kernel(be.make_loop(ele.neles, _update), ele.upts[0], ele.upts[2])
+
+    def step(self):
+        resid = self.rhs(0, 1, is_norm=True)
+        self.sys.eles.pre_jacobi()
+
+        # Temporal variables
+        dwmax1 = 0.0
+        dwmax2 = 0.0
+        dwmax = 0.0
+
+        # Sub-iteration for Jacobi method
+        for subiter in range(self.subiter):
+            dwmax2 = dwmax
+            dwmaxi = 0.0
+
+            self.sys.eles.jacobi()
+
+            # Collect error from entire domain
+            for subresi in self.sys.eles.subres:
+                dwmaxi = max(max(subresi), dwmaxi)
+            dwmax = self._comm.allreduce(dwmaxi, op=MPI.MAX)
+
+            if subiter == 0:
+                dwmax1 = dwmax
+            else:
+                if abs(dwmax - dwmax2)/dwmax1 < self.subtol:
+                    break
+
+        self.sys.eles.update()
+        self.sys.post(0)
+        
+        return 0, resid

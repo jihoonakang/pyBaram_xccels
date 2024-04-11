@@ -262,7 +262,7 @@ Time integration (or relaxation) schemes and related parameters are configured.
 
    For steady simulation, following options can be selected.
 
-    ``eulerexplicit`` | ``tvd-rk3`` | ``rk5`` | ``lu-sgs`` | ``colored-lu-sgs``
+    ``eulerexplicit`` | ``tvd-rk3`` | ``rk5`` | ``lu-sgs`` | ``colored-lu-sgs`` | ``jacobi``
 
     * ``lu-sgs`` --- This scheme works only if disabling multi-threading layer (``single``).
 
@@ -291,6 +291,19 @@ Time integration (or relaxation) schemes and related parameters are configured.
 
 11. turb-cfl-factor --- The factor of the ``cfl`` number for turbulent equations with respect to that of flow equations. 
     It adjusts the pseudo time for turbulence equations to alleviate numerical difficulties. The default value is 1.0.
+
+12. sub-iter --- The maximum iteration number for Jacobi sub-iteration process. The default value is 10.
+
+    `int`
+
+13. sub-tol --- The stopping criteria for the Jacobi sub-iteration. The default value is 0.005.
+
+    `float`
+
+14. visflux-jacobian --- The computing type of viscous jacobian matrix for jacobi method.
+    There are two options, ``tlns`` (Thin-layer Navier-Stokes) and ``exact``. The default type is tlns.
+
+    `string`
 
 Example for unsteady simulation::
 
