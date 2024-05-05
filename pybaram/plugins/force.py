@@ -100,7 +100,7 @@ class ForcePlugin(BasePlugin):
             header = lead + ['c{}_p'.format(x) for x in fdname]
 
             if self.viscous:
-                header += ['cf{}_v'.format(x) for x in fdname]
+                header += ['c{}_v'.format(x) for x in fdname]
 
             header += ['cm{}'.format(x) for x in mdname]
             self.outf = csv_write(fname, header)
@@ -142,7 +142,7 @@ class ForcePlugin(BasePlugin):
                 if self.ndims == 2:
                     moment.append(np.sum(mz))
                 else:
-                    moment.append(np.sum(mz, axis=1))
+                    moment.append(np.sum(mz, axis=0))
         else:
             # Get viscosity
             mus = list(intg.curr_mu)
