@@ -16,7 +16,7 @@ class RANSElements(BaseAdvecDiffElements):
         cfg.get('constants', 'pmin', '1e-15')
         self._const = cfg.items('constants')
 
-    def construct_kernels(self, vertex, xw, nreg):
+    def construct_kernels(self, vertex, xw, nreg, impl_op):
         # Aux array
         nauxvars = len(self.auxvars)
         self.aux = aux = np.empty((nauxvars, self.neles))
@@ -30,6 +30,11 @@ class RANSElements(BaseAdvecDiffElements):
 
         # Viscosity
         self.mu, self.mut = aux[1], aux[2]
+
+        if impl_op == 'spectral-radius':
+            # Spectral radius (flow and turbuelnt model)
+            self.fspr = np.empty((self.nface, self.neles))
+            self.tfspr = np.empty_like(self.fspr)
 
         # Update arguments of post kerenl
         self.post.update_args(self.upts_in, self.grad, self.mu, self.mut)
@@ -119,7 +124,7 @@ class RANSElements(BaseAdvecDiffElements):
         gamma, pmin = self._const['gamma'], self._const['pmin']
         pr, prt = self._const['pr'], self._const['prt']
 
-        def _lambdaf(u, nf, dx, idx, mu, mut):
+        def _lambdaf(u, nf, rcp_dx, mu, mut):
             rho, et = u[0], u[nfvars-1]
 
             contra = dot(u, nf, ndims, 1)/rho
@@ -127,7 +132,7 @@ class RANSElements(BaseAdvecDiffElements):
             c = np.sqrt(gamma*p/rho)
 
             # Wave speed abs(Vn) + c + 1/dx/rho * max(4/3 \gamma) (mu/pr + mut/prt)
-            return abs(contra) + c + 1/dx/rho * max(4/3, gamma)*(mu[idx]/pr + mut[idx]/prt)
+            return abs(contra) + c + rcp_dx/rho*max(4/3, gamma)*(mu/pr + mut/prt)
 
         return self.be.compile(_lambdaf)
 

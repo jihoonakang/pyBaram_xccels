@@ -10,10 +10,7 @@ import re
 class BaseAdvecIntInters(BaseIntInters):
     def construct_kernels(self, elemap):
         # View of elemenet array
-        fpts = [cell.fpts for cell in elemap.values()]
-
-        # Kernel to compute flux
-        self.compute_flux = Kernel(self._make_flux(), *fpts)
+        self._fpts = fpts = [cell.fpts for cell in elemap.values()]
 
         if self.order > 1:
             # Kernel to compute differnce of solution at face
@@ -47,13 +44,10 @@ class BaseAdvecMPIInters(BaseMPIInters):
     def construct_kernels(self, elemap):
         # Buffers
         lhs = np.empty((self.nvars, self.nfpts))
-        rhs = np.empty((self.nvars, self.nfpts))
+        self._rhs = rhs = np.empty((self.nvars, self.nfpts))
 
         # View of elemenet array
-        fpts = [cell.fpts for cell in elemap.values()]
-
-        # Kernel to compute flux
-        self.compute_flux = Kernel(self._make_flux(), rhs, *fpts)
+        self._fpts = fpts = [cell.fpts for cell in elemap.values()]
 
         if self.order > 1:
             # Kernel to compute differnce of solution at face
@@ -148,10 +142,7 @@ class BaseAdvecBCInters(BaseBCInters):
         self.construct_bc()
 
         # View of elemenet array
-        fpts = [cell.fpts for cell in elemap.values()]
-
-        # Kernel to compute flux
-        self.compute_flux = Kernel(self._make_flux(), *fpts)
+        self._fpts = fpts = [cell.fpts for cell in elemap.values()]
 
         if self.order > 1:
             # Kernel to compute differnce of solution at face

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import functools as fc
 import numpy as np
 
 
@@ -44,6 +45,11 @@ class BaseInters:
         # Parse index of elements and make index of each face point
         cell_nums = {c: i for i, c in enumerate(elemap)}
         return np.array([[cell_nums[t], e, f] for t, e, f, z in lhs]).T.copy()
+    
+    @property
+    @fc.lru_cache()
+    def _rcp_dx(self):
+        return 1/np.linalg.norm(self._dx_adj, axis=0)
 
 
 class BaseIntInters(BaseInters):

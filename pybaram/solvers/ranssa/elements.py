@@ -185,15 +185,15 @@ class RANSSAElements(RANSElements, RANSSAFluidElements):
         ndims, nvars = self.ndims, self.nvars
         sigma = self._turb_coeffs['sigma']
 
-        def _lambdaf(u, nf, dx, idx, mu, *args):
+        def _lambdaf(u, nf, rcp_dx, mu, *args):
             rho = u[0]
             contra = dot(u, nf, ndims, 1)/rho
 
-            nu = mu[idx]/rho
+            nu = mu/rho
             nut = u[nvars-1]
 
             # Wave speed : abs(Vn) + 1/dx/sigma*(nu+nut)
-            return abs(contra) + 1/dx*(nu + nut)/sigma
+            return abs(contra) + rcp_dx*(nu + nut)/sigma
 
         return self.be.compile(_lambdaf)
 

@@ -89,6 +89,17 @@ class BaseAdvecSystem(BaseSystem):
         else:
             return 'none'
 
+    def spec_rad(self):
+        # Compute solution at flux point (face center)
+        self.eles.compute_fpts()
+
+        # Compute spectral radius on faces
+        self.iint.compute_spec_rad()
+        self.bint.compute_spec_rad()
+
+        if self.mpiint:
+            self.mpiint.compute_spec_rad()
+
     def timestep(self, cfl, idx_in=0):
         # Compute time step with the given CFL number
         self.eles.upts_in.idx = idx_in

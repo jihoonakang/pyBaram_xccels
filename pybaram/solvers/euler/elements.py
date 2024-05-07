@@ -121,9 +121,13 @@ class EulerElements(BaseAdvecElements, FluidElements):
         cfg.get('constants', 'pmin', '1e-15')
         self._const = cfg.items('constants')
 
-    def construct_kernels(self, vertex, nreg):
+    def construct_kernels(self, vertex, nreg, impl_op):
         # Call paraent method
         super().construct_kernels(vertex, nreg)
+
+        if impl_op == 'spectral-radius':
+            # Spectral radius on face
+            self.fspr = np.empty((self.nface, self.neles))
 
         # Kernel to compute timestep
         self.timestep = Kernel(self._make_timestep(),

@@ -15,6 +15,7 @@ class BaseUnsteadyIntegrator(BaseIntegrator):
     - Runge-Kutta
     """
     mode = 'unsteady'
+    impl_op = 'none'
 
     def __init__(self, be, cfg, msh, soln, comm):
         # get MPI_COMM_WORLD

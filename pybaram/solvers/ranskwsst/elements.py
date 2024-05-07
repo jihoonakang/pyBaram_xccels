@@ -213,12 +213,12 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
         ndims = self.ndims
         sigma = 1.0
 
-        def _lambdaf(u, nf, dx, idx, mu, mut):
+        def _lambdaf(u, nf, rcp_dx, mu, mut):
             rho = u[0]
             contra = dot(u, nf, ndims, 1)/rho
 
             # Wave speed : abs(Vn) + 1/dx/rho/sigma*(mu+mut)
-            return abs(contra) + 1/dx*(mu[idx] + mut[idx])/rho/sigma
+            return abs(contra) + rcp_dx*(mu + mut)/rho/sigma
 
         return self.be.compile(_lambdaf)
 
