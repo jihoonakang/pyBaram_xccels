@@ -30,41 +30,22 @@ def make_lusgs_update(ele):
     return _update
 
 
-def make_lusgs_common(ele, _lambdaf, factor=1.0):
+def make_lusgs_common(ele, factor=1.0):
     # Number of faces
     nface = ele.nface
 
     # Normal vectors for faces and displacement from cell center to neighbor cells
-    fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
-    dxc = np.linalg.norm(ele.dxc, axis=2)
+    fnorm_vol = ele.mag_fnorm * ele.rcp_vol
 
-    # Get index array for neihboring cells
-    nei_ele = ele.nei_ele
-
-    def _pre_lusgs(i_begin, i_end, uptsb, dt, diag, lambdaf, mu=None, mut=None):
+    def _pre_lusgs(i_begin, i_end, dt, diag, lambdaf):
         # Construct Matrices for LU-SGS
         for idx in range(i_begin, i_end):
             # Diagonals of implicit operator
             diag[idx] = 1 / (dt[idx]*factor)
 
-            for jdx in range(nface):
-                dx = dxc[jdx, idx]
-                nf = vec_fnorm[jdx, :, idx]
-
-                # Wave speed at face
-                u = uptsb[:, idx]
-
-                lamf = _lambdaf(u, nf, dx, idx, mu, mut)
-
-                neib = nei_ele[jdx, idx]
-                if neib != idx:
-                    u = uptsb[:, neib]
-
-                    # Find maximum wave speed at face
-                    lamf = max(_lambdaf(u, nf, dx, neib, mu, mut), lamf)
-
+            for jdx in range(nface):               
                 # Diffusive margin of wave speed at face
-                lamf *= 1.01
+                lamf = lambdaf[jdx, idx]*1.01
 
                 # Save spectral radius
                 lambdaf[jdx, idx] = lamf

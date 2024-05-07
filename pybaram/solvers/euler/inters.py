@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from pybaram.solvers.baseadvec import BaseAdvecIntInters, BaseAdvecBCInters, BaseAdvecMPIInters
+from pybaram.backends.types import Kernel
 from pybaram.solvers.euler.rsolvers import get_rsolver
 from pybaram.solvers.euler.bcs import get_bc
 
@@ -7,6 +8,19 @@ import numpy as np
 
 
 class EulerIntInters(BaseAdvecIntInters):
+    def construct_kernels(self, elemap, impl_op):
+        super().construct_kernels(elemap)        
+
+        # Kernel to compute flux
+        fpts = self._fpts
+        self.compute_flux = Kernel(self._make_flux(), *fpts)
+
+        if impl_op == 'spectral-radius':
+            # Kernel to compute Spectral radius
+            nele = len(fpts)
+            fspr = [cell.fspr for cell in elemap.values()]
+            self.compute_spec_rad = Kernel(self._make_spec_rad(nele), *fpts, *fspr)
+
     def _make_flux(self):
         ndims, nfvars = self.ndims, self.nfvars
         lt, le, lf = self._lidx
@@ -52,7 +66,53 @@ class EulerIntInters(BaseAdvecIntInters):
         return self.be.make_loop(self.nfpts, comm_flux)
 
 
+    def _make_spec_rad(self, nele):
+        lt, le, lf = self._lidx
+        rt, re, rf = self._ridx
+        nf = self._vec_snorm
+
+        # Get wave speed function
+        wave_speed = self.ele0.make_wave_speed()
+
+        def comm_spr(i_begin, i_end, *ufl):
+            uf, lam = ufl[:nele], ufl[nele:]
+
+            for idx in range(i_begin, i_end):
+                # Normal vector
+                nfi = nf[:, idx]
+
+                # Left and right solutions
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                rti, rfi, rei = rt[idx], rf[idx], re[idx]
+                ul = uf[lti][lfi, :, lei]
+                ur = uf[rti][rfi, :, rei]
+
+                # Compute wave speed on both cell
+                laml = wave_speed(ul, nfi)
+                lamr = wave_speed(ur, nfi)
+
+                # Compute spectral radius on face
+                lami = max(laml, lamr)
+                lam[lti][lfi, lei] = lami
+                lam[rti][rfi, rei] = lami
+
+        return self.be.make_loop(self.nfpts, comm_spr)
+
+
 class EulerMPIInters(BaseAdvecMPIInters):
+    def construct_kernels(self, elemap, impl_op):
+        super().construct_kernels(elemap)        
+
+        # Kernel to compute flux
+        fpts, rhs = self._fpts, self._rhs
+        self.compute_flux = Kernel(self._make_flux(), rhs, *fpts)
+
+        if impl_op == 'spectral-radius':
+            # Kernel to compute Spectral radius
+            nele = len(fpts)
+            fspr = [cell.fspr for cell in elemap.values()]
+            self.compute_spec_rad = Kernel(self._make_spec_rad(nele), *fpts, *fspr)
+
     def _make_flux(self):
         ndims, nfvars = self.ndims, self.nfvars
         lt, le, lf = self._lidx
@@ -94,9 +154,46 @@ class EulerMPIInters(BaseAdvecMPIInters):
 
         return self.be.make_loop(self.nfpts, comm_flux)
 
+    def _make_spec_rad(self, nele):
+        lt, le, lf = self._lidx
+        nf = self._vec_snorm
+
+        # Get wave speed function
+        wave_speed = self.ele0.make_wave_speed()
+
+        def comm_spr(i_begin, i_end, *ufl):
+            uf, lam = ufl[:nele], ufl[nele:]
+
+            for idx in range(i_begin, i_end):
+                # Normal vector
+                nfi = nf[:, idx]
+
+                # Left solution
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                ul = uf[lti][lfi, :, lei]
+
+                # Compute spectral radius on face
+                lami = wave_speed(ul, nfi)
+                lam[lti][lfi, lei] = lami
+
+        return self.be.make_loop(self.nfpts, comm_spr)
+
 
 class EulerBCInters(BaseAdvecBCInters):
     _get_bc = get_bc
+
+    def construct_kernels(self, elemap, impl_op):
+        super().construct_kernels(elemap)
+        
+        # Kernel to compute flux
+        fpts = self._fpts
+        self.compute_flux = Kernel(self._make_flux(), *fpts)
+
+        if impl_op == 'spectral-radius':
+            # Kernel to compute Spectral radius
+            nele = len(fpts)
+            fspr = [cell.fspr for cell in elemap.values()]
+            self.compute_spec_rad = Kernel(self._make_spec_rad(nele), *fpts, *fspr)
 
     def _make_flux(self):
         ndims, nfvars = self.ndims, self.nfvars
@@ -145,6 +242,30 @@ class EulerBCInters(BaseAdvecBCInters):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, bc_flux)
+
+    def _make_spec_rad(self, nele):
+        lt, le, lf = self._lidx
+        nf = self._vec_snorm
+
+        # Get wave speed function
+        wave_speed = self.ele0.make_wave_speed()
+
+        def comm_spr(i_begin, i_end, *ufl):
+            uf, lam = ufl[:nele], ufl[nele:]
+
+            for idx in range(i_begin, i_end):
+                # Normal vector
+                nfi = nf[:, idx]
+
+                # Left solution
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                ul = uf[lti][lfi, :, lei]
+
+                # Compute spectral radius on face
+                lami = wave_speed(ul, nfi)
+                lam[lti][lfi, lei] = lami
+
+        return self.be.make_loop(self.nfpts, comm_spr)
 
 
 class EulerSupOutBCInters(EulerBCInters):

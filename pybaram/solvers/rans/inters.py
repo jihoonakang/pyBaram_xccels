@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from pybaram.solvers.baseadvecdiff import BaseAdvecDiffIntInters, BaseAdvecDiffBCInters, BaseAdvecDiffMPIInters
+from pybaram.backends.types import Kernel
 from pybaram.solvers.rans.visflux import make_visflux
 from pybaram.solvers.euler.rsolvers import get_rsolver
 from pybaram.utils.np import npeval
@@ -9,13 +10,27 @@ import re
 
 
 class RANSIntInters(BaseAdvecDiffIntInters):
-    def construct_kernels(self, elemap):
+    def construct_kernels(self, elemap, impl_op):
         # Wall distance at face
         ydistf = [cell.ydist for cell in elemap.values()]
         self.ydist = np.array([ydistf[t][e]  for (t, e, _) in self._lidx.T])
-        
+
         # Call Parent method
         super().construct_kernels(elemap)
+
+        # Save viscosity on face (for implicit operator)
+        muf = np.empty((2,self.nfpts))
+
+        # Kernel to compute flux
+        fpts, gradf = self._fpts, self._gradf
+        self.compute_flux = Kernel(self._make_flux(), muf, gradf, *fpts)
+
+        if impl_op == 'spectral-radius':
+            # Kernel to compute Spectral radius
+            nele = len(fpts)
+            fspr = [cell.fspr for cell in elemap.values()]
+            tfspr = [cell.tfspr for cell in elemap.values()]
+            self.compute_spec_rad = Kernel(self._make_spec_rad(nele), muf, *fpts, *fspr, *tfspr)
 
     def _make_flux(self):
         ndims, nvars, nfvars = self.ndims, self.nvars, self.nfvars
@@ -48,7 +63,7 @@ class RANSIntInters(BaseAdvecDiffIntInters):
         # Get turbulence flux from `turbulent.py`
         tflux = self._make_turb_flux()
 
-        def comm_flux(i_begin, i_end, gradf, *uf):
+        def comm_flux(i_begin, i_end, muf, gradf, *uf):
             for idx in range(i_begin, i_end):
                 fn = array(nvars)
                 um = array(nvars)
@@ -73,8 +88,8 @@ class RANSIntInters(BaseAdvecDiffIntInters):
                 flux(ul, ur, nfi, fn)
                 
                 # Compute viscosity and viscous flux
-                mu = compute_mu(um)
-                mut = compute_mut(um, gf, mu, ydnsi)
+                muf[0, idx] = mu = compute_mu(um)
+                muf[1, idx] = mut = compute_mut(um, gf, mu, ydnsi)
                 visflux(um, gf, nfi, mu, mut, fn)
 
                 # Compute turbulent flux
@@ -87,15 +102,84 @@ class RANSIntInters(BaseAdvecDiffIntInters):
 
         return self.be.make_loop(self.nfpts, comm_flux)
 
+    def _make_spec_rad(self, nele):
+        nvars = self.nvars
+        lt, le, lf = self._lidx
+        rt, re, rf = self._ridx
+        nf = self._vec_snorm
+        
+        # reciprocal of distance between two cells
+        rcp_dx = self._rcp_dx
+
+        # Get wave speed function
+        array = self.be.local_array()
+        wave_speed = self.ele0.make_wave_speed()
+        twave_speed = self.ele0.make_turb_wave_speed()
+
+        def comm_spr(i_begin, i_end, muf, *ufl):
+            uf, _lam = ufl[:nele], ufl[nele:]
+            lam, tlam = _lam[:nele], _lam[nele:]
+
+            for idx in range(i_begin, i_end):
+                um = array(nvars)
+
+                # Normal vector
+                nfi = nf[:, idx]
+                rcp_dxi = rcp_dx[idx]
+
+                # Left and right solutions
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                rti, rfi, rei = rt[idx], rf[idx], re[idx]
+                ul = uf[lti][lfi, :, lei]
+                ur = uf[rti][rfi, :, rei]
+
+                # Get viscosity on face (saved at rhside)
+                mu = muf[0, idx]
+                mut = muf[1, idx]
+
+                # Compute wave speed on both cell
+                laml = wave_speed(ul, nfi, rcp_dxi, mu, mut)
+                lamr = wave_speed(ur, nfi, rcp_dxi, mu, mut)
+
+                # Compute spectral radius on face
+                lami = max(laml, lamr)
+                lam[lti][lfi, lei] = lami
+                lam[rti][rfi, rei] = lami
+
+                for jdx in range(nvars):
+                    um[jdx] = 0.5*(ul[jdx] + ur[jdx])
+
+                # Compute turbulent spectral radius
+                tlami = twave_speed(um, nfi, rcp_dxi, mu, mut)
+                tlam[lti][lfi, lei] = tlami
+                tlam[rti][rfi, rei] = tlami
+
+        return self.be.make_loop(self.nfpts, comm_spr)
+
 
 class RANSMPIInters(BaseAdvecDiffMPIInters):
-    def construct_kernels(self, elemap):
+    def construct_kernels(self, elemap, impl_op):
         # Wall distance at face
         ydistf = [cell.ydist for cell in elemap.values()]
         self.ydist = np.array([ydistf[t][e]  for (t, e, _) in self._lidx.T])
-        
+
         # Call Parent method
         super().construct_kernels(elemap)
+
+        # Save viscosity on face (for implicit operator)
+        muf = np.empty((2,self.nfpts))
+
+        # Kernel to compute flux
+        fpts, gradf = self._fpts, self._gradf
+        rhs = self._rhs
+        self.compute_flux = Kernel(self._make_flux(), muf, gradf, rhs, *fpts)
+
+        if impl_op == 'spectral-radius':
+            # Kernel to compute Spectral radius
+            nele = len(fpts)
+            fspr = [cell.fspr for cell in elemap.values()]
+            tfspr = [cell.tfspr for cell in elemap.values()]
+            self.compute_spec_rad = Kernel(self._make_spec_rad(nele), muf, *fpts, *fspr, *tfspr)
 
     def _make_flux(self):
         ndims, nvars, nfvars = self.ndims, self.nvars, self.nfvars
@@ -127,7 +211,7 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
         # Get turbulence flux from `turbulent.py`
         tflux = self._make_turb_flux()
 
-        def comm_flux(i_begin, i_end, gradf, rhs, *uf):
+        def comm_flux(i_begin, i_end, muf, gradf, rhs, *uf):
             for idx in range(i_begin, i_end):
                 fn = array(nvars)
                 um = array(nvars)
@@ -151,8 +235,8 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
                 flux(ul, ur, nfi, fn)
                 
                 # Compute viscosity and viscous flux
-                mu = compute_mu(um)
-                mut = compute_mut(um, gf, mu, ydnsi)
+                muf[0, idx] = mu = compute_mu(um)
+                muf[1, idx] = mut = compute_mut(um, gf, mu, ydnsi)
                 visflux(um, gf, nfi, mu, mut, fn)
 
                 # Compute turbulent flux
@@ -163,6 +247,44 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)
+    
+    def _make_spec_rad(self, nele):
+        lt, le, lf = self._lidx
+        nf = self._vec_snorm
+        
+        # reciprocal of distance between two cells
+        rcp_dx = self._rcp_dx
+
+        # Get wave speed function
+        wave_speed = self.ele0.make_wave_speed()
+        twave_speed = self.ele0.make_turb_wave_speed()
+
+        def comm_spr(i_begin, i_end, muf, *ufl):
+            uf, _lam = ufl[:nele], ufl[nele:]
+            lam, tlam = _lam[:nele], _lam[nele:]
+
+            for idx in range(i_begin, i_end):
+                # Normal vector
+                nfi = nf[:, idx]
+                rcp_dxi = rcp_dx[idx]
+
+                # Left and right solutions
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                ul = uf[lti][lfi, :, lei]
+
+                # Get viscosity on face (saved at rhside)
+                mu = muf[0, idx]
+                mut = muf[1, idx]
+
+                # Compute spectral radius on face
+                lami = wave_speed(ul, nfi, rcp_dxi, mu, mut)
+                lam[lti][lfi, lei] = lami
+
+                # Compute turbulent spectral radius
+                tlami = twave_speed(ul, nfi, rcp_dxi, mu, mut)
+                tlam[lti][lfi, lei] = tlami
+
+        return self.be.make_loop(self.nfpts, comm_spr)
 
 
 class RANSBCInters(BaseAdvecDiffBCInters):
@@ -188,13 +310,27 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         # Get bc from `bcs.py` (in rans...) and compile them
         self.bc = self._get_bc(self.be, bcf, bcc)
 
-    def construct_kernels(self, elemap):
+    def construct_kernels(self, elemap, impl_op):
         # Wall distance at face
         ydistf = [cell.ydist for cell in elemap.values()]
         self.ydist = np.array([ydistf[t][e]  for (t, e, _) in self._lidx.T])
-        
+
         # Call Parent method
         super().construct_kernels(elemap)
+
+        # Save viscosity on face (for implicit operator)
+        muf = np.empty((2,self.nfpts))
+
+        # Kernel to compute flux
+        fpts, gradf = self._fpts, self._gradf
+        self.compute_flux = Kernel(self._make_flux(), muf, gradf, *fpts)
+
+        if impl_op == 'spectral-radius':
+            # Kernel to compute Spectral radius
+            nele = len(fpts)
+            fspr = [cell.fspr for cell in elemap.values()]
+            tfspr = [cell.tfspr for cell in elemap.values()]
+            self.compute_spec_rad = Kernel(self._make_spec_rad(nele), muf, *fpts, *fspr, *tfspr)
 
     def _make_delu(self):
         nvars, ndims = self.nvars, self.ndims
@@ -259,7 +395,7 @@ class RANSBCInters(BaseAdvecDiffBCInters):
         # Get bc function (`self.bc` was defined at `baseadvec.inters`)
         bc = self.bc
 
-        def comm_flux(i_begin, i_end, gradf, *uf):
+        def comm_flux(i_begin, i_end, muf, gradf, *uf):
             for idx in range(i_begin, i_end):
                 fn = array(nvars)
                 um = array(nvars)
@@ -290,8 +426,8 @@ class RANSBCInters(BaseAdvecDiffBCInters):
                 flux(ul, ur, nfi, fn)
                 
                 # Compute viscosity and viscous flux
-                mu = compute_mu(um)
-                mut = compute_mut(um, gf, mu, ydnsi)
+                muf[0, idx] = mu = compute_mu(um)
+                muf[1, idx] = mut = compute_mut(um, gf, mu, ydnsi)
                 visflux(um, gf, nfi, mu, mut, fn)
 
                 # Compute turbulent flux
@@ -302,6 +438,44 @@ class RANSBCInters(BaseAdvecDiffBCInters):
                     uf[lti][lfi, jdx, lei] = fn[jdx]*sf[idx]
 
         return self.be.make_loop(self.nfpts, comm_flux)
+
+    def _make_spec_rad(self, nele):
+        lt, le, lf = self._lidx
+        nf = self._vec_snorm
+        
+        # reciprocal of distance between two cells
+        rcp_dx = self._rcp_dx
+
+        # Get wave speed function
+        wave_speed = self.ele0.make_wave_speed()
+        twave_speed = self.ele0.make_turb_wave_speed()
+
+        def comm_spr(i_begin, i_end, muf, *ufl):
+            uf, _lam = ufl[:nele], ufl[nele:]
+            lam, tlam = _lam[:nele], _lam[nele:]
+
+            for idx in range(i_begin, i_end):
+                # Normal vector
+                nfi = nf[:, idx]
+                rcp_dxi = rcp_dx[idx]
+
+                # Left solution
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                ul = uf[lti][lfi, :, lei]
+
+                # Get viscosity on face (saved at rhside)
+                mu = muf[0, idx]
+                mut = muf[1, idx]
+
+                # Compute spectral radius on face
+                lami = wave_speed(ul, nfi, rcp_dxi, mu, mut)
+                lam[lti][lfi, lei] = lami
+
+                # Compute turbulent spectral radius
+                tlami = twave_speed(ul, nfi, rcp_dxi, mu, mut)
+                tlam[lti][lfi, lei] = tlami
+
+        return self.be.make_loop(self.nfpts, comm_spr)
 
 
 class RANSSlipWallBCInters(RANSBCInters):

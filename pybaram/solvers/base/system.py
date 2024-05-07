@@ -16,7 +16,7 @@ class BaseSystem:
     _bcinters_cls = BaseBCInters
     _vertex_cls = BaseVertex
 
-    def __init__(self, be, cfg, msh, soln, comm, nreg):
+    def __init__(self, be, cfg, msh, soln, comm, nreg, impl_op):
         # Save parallel infos
         self._comm = comm
         self.rank = rank = comm.rank
@@ -38,9 +38,9 @@ class BaseSystem:
         self.vertex = vertex = self.load_vertex(msh, be, cfg, rank, elemap)
 
         # Construct kerenls
-        self.eles.construct_kernels(vertex, nreg)
-        self.iint.construct_kernels(elemap)
-        self.bint.construct_kernels(elemap)
+        self.eles.construct_kernels(vertex, nreg, impl_op)
+        self.iint.construct_kernels(elemap, impl_op)
+        self.bint.construct_kernels(elemap, impl_op)
 
         # Check reconstructed or not
         self._is_recon = (cfg.getint('solver', 'order', 1) > 1)
@@ -49,7 +49,7 @@ class BaseSystem:
             from mpi4py import MPI
 
             # Construct MPI kernels
-            self.mpiint.construct_kernels(elemap)
+            self.mpiint.construct_kernels(elemap, impl_op)
 
         # Construct Vertex kernels
         self.vertex.construct_kernels(elemap)

@@ -8,9 +8,9 @@ from pybaram.solvers.ranskwsst.system import RANSKWSSTSystem
 from pybaram.utils.misc import subclass_by_name
 
 
-def get_system(be, cfg, msh, soln, comm, nreg):
+def get_system(be, cfg, msh, soln, comm, nreg, impl_op):
     name = cfg.get('solver', 'system')
-    return subclass_by_name(BaseSystem, name)(be, cfg, msh, soln, comm, nreg)
+    return subclass_by_name(BaseSystem, name)(be, cfg, msh, soln, comm, nreg, impl_op)
 
 
 def get_fluid(name):

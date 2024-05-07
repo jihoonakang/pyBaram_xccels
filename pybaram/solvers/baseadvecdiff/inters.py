@@ -9,12 +9,12 @@ import numpy as np
 class BaseAdvecDiffIntInters(BaseAdvecIntInters):
     def construct_kernels(self, elemap):
         # View of elemenet array (flux and gradient)
-        fpts = [cell.fpts for cell in elemap.values()]
+        self._fpts = fpts = [cell.fpts for cell in elemap.values()]
         dfpts = [cell.grad for cell in elemap.values()]
         nele = len(fpts)
 
         # Array for gradient at face
-        gradf = np.empty((self.ndims, self.nvars, self.nfpts))
+        self._gradf = gradf = np.empty((self.ndims, self.nvars, self.nfpts))
 
         # Kernel to compute differnce of solution at face
         self.compute_delu = Kernel(self._make_delu(), *fpts)
@@ -24,16 +24,13 @@ class BaseAdvecDiffIntInters(BaseAdvecIntInters):
             self._make_grad_at(nele), gradf, *fpts, *dfpts
         )
 
-        # Kernel to compute flux
-        self.compute_flux = Kernel(self._make_flux(), gradf, *fpts)
-
     def _make_grad_at(self, nele):
         nvars, ndims = self.nvars, self.ndims
         lt, le, lf = self._lidx
         rt, re, rf = self._ridx
 
         # Mangitude and direction of the connecting vector
-        inv_tf = 1/np.linalg.norm(self._dx_adj, axis=0)
+        inv_tf = self._rcp_dx
         tf = self._dx_adj * inv_tf
         avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 
@@ -77,16 +74,15 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
     def construct_kernels(self, elemap):
         # Buffers
         lhs = np.empty((self.nvars, self.nfpts))
-        rhs = np.empty((self.nvars, self.nfpts))
+        self._rhs = rhs = np.empty((self.nvars, self.nfpts))
 
         # Gradient at face and buffer
-        gradf = np.empty((self.ndims, self.nvars, self.nfpts))
+        self._gradf = gradf = np.empty((self.ndims, self.nvars, self.nfpts))
         grad_rhs = np.empty((self.ndims, self.nvars, self.nfpts))
 
         # View of element array
-        fpts = [cell.fpts for cell in elemap.values()]
+        self._fpts = fpts = [cell.fpts for cell in elemap.values()]
         dfpts = [cell.grad for cell in elemap.values()]
-        nele = len(fpts)
 
         # Kernel to compute differnce of solution at face
         self.compute_delu = Kernel(self._make_delu(), rhs, *fpts)
@@ -95,9 +91,6 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
         self.compute_grad_at = Kernel(
             self._make_grad_at(), gradf, grad_rhs, *fpts
         )
-
-        # Kernel to compute flux
-        self.compute_flux = Kernel(self._make_flux(), gradf, rhs, *fpts)
 
         # Kernel for pack, send, receive
         self.pack = Kernel(self._make_pack(), lhs, *fpts)
@@ -113,7 +106,7 @@ class BaseAdvecDiffMPIInters(BaseAdvecMPIInters):
         lt, le, lf = self._lidx
 
         # Mangitude and direction of the connecting vector
-        inv_tf = 1/np.linalg.norm(self._dx_adj, axis=0)
+        inv_tf = self._rcp_dx
         tf = self._dx_adj * inv_tf
         avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 
@@ -167,12 +160,12 @@ class BaseAdvecDiffBCInters(BaseAdvecBCInters):
         self.construct_bc()
 
         # View of elemenet array
-        fpts = [cell.fpts for cell in elemap.values()]
+        self._fpts = fpts = [cell.fpts for cell in elemap.values()]
         dfpts = [cell.grad for cell in elemap.values()]
         nele = len(fpts)
 
         # Gradient at face
-        gradf = np.empty((self.ndims, self.nvars, self.nfpts))
+        self._gradf = gradf = np.empty((self.ndims, self.nvars, self.nfpts))
 
         # Kernel to compute differnce of solution at face
         self.compute_delu = Kernel(self._make_delu(), *fpts)
@@ -182,15 +175,12 @@ class BaseAdvecDiffBCInters(BaseAdvecBCInters):
             self._make_grad_at(nele), gradf, *fpts, *dfpts
         )
 
-        # Kernel to compute flux
-        self.compute_flux = Kernel(self._make_flux(), gradf, *fpts)
-
     def _make_grad_at(self, nele):
         nvars, ndims = self.nvars, self.ndims
         lt, le, lf = self._lidx
 
         # Mangitude and direction of the connecting vector
-        inv_tf = 1/np.linalg.norm(self._dx_adj, axis=0)
+        inv_tf = self._rcp_dx
         tf = self._dx_adj * inv_tf
         avec = self._vec_snorm/np.einsum('ij,ij->j', tf, self._vec_snorm)
 

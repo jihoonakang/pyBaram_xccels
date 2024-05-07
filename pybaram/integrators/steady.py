@@ -12,6 +12,7 @@ import re
 
 class BaseSteadyIntegrator(BaseIntegrator):
     mode = 'steady'
+    impl_op = 'none'
 
     def __init__(self, be, cfg, msh, soln, comm):
         # get MPI_COMM_WORLD
@@ -285,6 +286,7 @@ class FiveStageRK(BaseSteadyIntegrator):
 class LUSGS(BaseSteadyIntegrator):
     name = 'lu-sgs'
     nreg = 3
+    impl_op = 'spectral-radius'
 
     def construct_stages(self):
         from pybaram.integrators.lusgs import make_lusgs_common, make_lusgs_update, make_serial_lusgs
@@ -298,20 +300,14 @@ class LUSGS(BaseSteadyIntegrator):
 
             # diagonal and lambda array
             diag = np.empty(ele.neles)
-            lambdaf = np.empty((ele.nface, ele.neles))
 
             # Get Python functions of flux and wave speed
             _flux = ele.flux_container()
-            _lambdaf = ele.make_wave_speed()
             nv = (0, ele.nfvars)
-
-            # Get viscosity if exists
-            mu = ele.mu if hasattr(ele, 'mu') else None
-            mut = ele.mut if hasattr(ele, 'mut') else None
 
             # Compile LU-SGS functions
             _update = make_lusgs_update(ele)
-            _pre_lusgs = make_lusgs_common(ele, _lambdaf, factor=1.0)
+            _pre_lusgs = make_lusgs_common(ele, factor=1.0)
             _lsweep, _usweep = make_serial_lusgs(
                 be, ele, nv, mapping, unmapping, _flux
             )
@@ -319,13 +315,13 @@ class LUSGS(BaseSteadyIntegrator):
             # Initiate LU-SGS kernel objects
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 
-                ele.upts[0], ele.dt, diag, lambdaf, mu, mut
+                ele.dt, diag, ele.fspr
             )            
             lsweeps = Kernel(be.make_loop(ele.neles, func=_lsweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf) 
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, ele.fspr) 
 
             usweeps = Kernel(be.make_loop(ele.neles, func=_usweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf)
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, ele.fspr)
 
             kernels = [pre_lusgs, lsweeps, usweeps]
 
@@ -333,11 +329,10 @@ class LUSGS(BaseSteadyIntegrator):
             if self._is_turb:
                 # Get Python function of flux and wave speed for turbulent variables
                 _tflux = ele.tflux_container()
-                _tlambdaf = ele.make_turb_wave_speed()
                 tnv = (ele.nfvars, ele.nvars)
 
                 # Compile LU-SGS functions for turbulent variables
-                _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=self._tcfl_fac)
+                _pre_tlusgs = make_lusgs_common(ele, factor=self._tcfl_fac)
                 _tlsweep, _tusweep = make_serial_lusgs(
                     be, ele, tnv, mapping, unmapping, _tflux
                 )
@@ -345,13 +340,13 @@ class LUSGS(BaseSteadyIntegrator):
                 # Initiate LU-SGS kernel objects for turbulent variables
                 pre_tlusgs = Kernel(
                     be.make_loop(ele.neles, _pre_tlusgs), 
-                    ele.upts[0], ele.dt, diag, lambdaf, mu, mut
+                    ele.dt, diag, ele.tfspr
                 )                
                 tlsweeps = Kernel(be.make_loop(ele.neles, func=_tlsweep),
-                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf) 
+                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, ele.tfspr) 
 
                 tusweeps = Kernel(be.make_loop(ele.neles, func=_tusweep),
-                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf)    
+                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, ele.tfspr)    
 
                 kernels += [pre_tlusgs, tlsweeps, tusweeps]             
 
@@ -365,6 +360,7 @@ class LUSGS(BaseSteadyIntegrator):
     
     def step(self):
         resid = self.rhs(0, 1, is_norm=True)
+        self.sys.spec_rad()
         self.sys.eles.lusgs()
         self.sys.eles.update()
 
@@ -376,6 +372,7 @@ class LUSGS(BaseSteadyIntegrator):
 class ColoredLUSGS(BaseSteadyIntegrator):
     name = 'colored-lu-sgs'
     nreg = 3
+    impl_op = 'spectral-radius'
 
     def construct_stages(self):
         from pybaram.integrators.lusgs import  make_lusgs_common, make_lusgs_update, make_colored_lusgs
@@ -389,20 +386,14 @@ class ColoredLUSGS(BaseSteadyIntegrator):
              
             # diagonal and lambda array
             diag = np.empty(ele.neles)
-            lambdaf = np.empty((ele.nface, ele.neles))
 
             # Get Python functions of flux and wave speed
             _flux = ele.flux_container()
-            _lambdaf = ele.make_wave_speed()
             nv = (0, ele.nfvars)
-
-            # Get viscosity if exists
-            mu = ele.mu if hasattr(ele, 'mu') else None
-            mut = ele.mut if hasattr(ele, 'mut') else None
 
             # Compile LU-SGS functions
             _update = make_lusgs_update(ele)
-            _pre_lusgs = make_lusgs_common(ele, _lambdaf)
+            _pre_lusgs = make_lusgs_common(ele, factor=1.0)
             _lsweep, _usweep = make_colored_lusgs(
                 be, ele, nv, icolor, lev_color, _flux
             )
@@ -410,19 +401,19 @@ class ColoredLUSGS(BaseSteadyIntegrator):
             # Initiate LU-SGS kernel objects
             pre_lusgs = Kernel(
                 be.make_loop(ele.neles, _pre_lusgs), 
-                ele.upts[0], ele.dt, diag, lambdaf, mu, mut
+                ele.dt, diag, ele.fspr
             )
             
             lsweeps = [
                 Kernel(be.make_loop(n0=n0, ne=ne, func=_lsweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, ele.fspr
                 ) 
                 for n0, ne in zip(ncolor[:-1], ncolor[1:])
             ]
 
             usweeps = [
                 Kernel(be.make_loop(n0=n0, ne=ne, func=_usweep),
-                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf
+                ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, ele.fspr
                 ) 
                 for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
             ]
@@ -433,11 +424,10 @@ class ColoredLUSGS(BaseSteadyIntegrator):
             if self._is_turb:
                 # Get Python function of flux and wave speed for turbulent variables
                 _tflux = ele.tflux_container()
-                _tlambdaf = ele.make_turb_wave_speed()
                 tnv = (ele.nfvars, ele.nvars)
 
                 # Compile LU-SGS functions for turbulent variables
-                _pre_tlusgs = make_lusgs_common(ele, _tlambdaf, factor=self._tcfl_fac)
+                _pre_tlusgs = make_lusgs_common(ele, factor=self._tcfl_fac)
                 _tlsweep, _tusweep = make_colored_lusgs(
                     be, ele, tnv, icolor, lev_color, _tflux
                 )
@@ -445,19 +435,19 @@ class ColoredLUSGS(BaseSteadyIntegrator):
                 # Initiate LU-SGS kernel objects for turbulent variables
                 pre_tlusgs = Kernel(
                     be.make_loop(ele.neles, _pre_tlusgs), 
-                    ele.upts[0], ele.dt, diag, lambdaf, mu, mut
+                    ele.dt, diag, ele.tfspr
                 )                
 
                 tlsweeps = [
                     Kernel(be.make_loop(n0=n0, ne=ne, func=_tlsweep),
-                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf
+                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, ele.tfspr
                     ) 
                     for n0, ne in zip(ncolor[:-1], ncolor[1:])
                 ]
 
                 tusweeps = [
                     Kernel(be.make_loop(n0=n0, ne=ne, func=_tusweep),
-                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, lambdaf
+                    ele.upts[0], ele.upts[1], ele.upts[2], diag, ele.dsrc, ele.tfspr
                     ) 
                     for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
                 ] 
@@ -474,6 +464,7 @@ class ColoredLUSGS(BaseSteadyIntegrator):
     
     def step(self):
         resid = self.rhs(0, 1, is_norm=True)
+        self.sys.spec_rad()
         self.sys.eles.lusgs()
         self.sys.eles.update()
 
@@ -485,6 +476,7 @@ class ColoredLUSGS(BaseSteadyIntegrator):
 class BlockJacobi(BaseSteadyIntegrator):
     name = 'jacobi'
     nreg = 4
+    impl_op = 'approx-jacobian'
 
     def construct_stages(self):
         from pybaram.integrators.jacobi import make_jacobi_update, make_jacobi_sweep, make_jacobi_common
