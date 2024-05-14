@@ -3,7 +3,7 @@ import numpy as np
 import re
 
 from collections import OrderedDict
-from pybaram.solvers.base import BaseElements, BaseIntInters, BaseBCInters, BaseMPIInters, BaseVertex
+from pybaram.solvers.base import BaseElements, BaseIntInters, BaseBCInters, BaseMPIInters, BaseVRInters, BaseVertex
 from pybaram.utils.misc import ProxyList, subclass_by_name
 from pybaram.backends.types import Queue
 
@@ -14,6 +14,7 @@ class BaseSystem:
     _intinters_cls = BaseIntInters
     _mpiinters_cls = BaseMPIInters
     _bcinters_cls = BaseBCInters
+    _vrinters_cls = BaseVRInters
     _vertex_cls = BaseVertex
 
     def __init__(self, be, cfg, msh, soln, comm, nreg, impl_op):
@@ -28,8 +29,8 @@ class BaseSystem:
         # load interfaces
         self.iint = self.load_int_inters(msh, be, cfg, rank, elemap)
 
-        # load bc
-        self.bint = self.load_bc_inters(msh, be, cfg, rank, elemap)
+        # load bc and vr
+        self.bint, self.vint = self.load_bc_inters(msh, be, cfg, rank, elemap)
 
         # load mpiint
         self.mpiint = self.load_mpi_inters(msh, be, cfg, rank, elemap)
@@ -104,21 +105,32 @@ class BaseSystem:
 
     def load_bc_inters(self, msh, be, cfg, rank, elemap):
         bint = ProxyList()
+        vint = ProxyList()
+
         for key in msh:
             m = re.match(r'bcon_([a-z_\d]+)_p{}$'.format(rank), key)
 
             if m:
                 lhs = msh[m.group(0)].astype('U4,i4,i1,i1').tolist()
+                name = m.group(1)
 
-                bcsect = 'soln-bcs-{}'.format(m.group(1))
-                bctype = cfg.get(bcsect, 'type')
+                if name.startswith('_virtual_'):
+                    # Initiate virtual interfaces
+                    vint.append(
+                        self._vrinters_cls(be, cfg, elemap, lhs, name[9:])
+                    )                        
+                    
+                else:
+                    bcsect = 'soln-bcs-{}'.format(name)
+                    bctype = cfg.get(bcsect, 'type')
 
-                bint.append(
-                    subclass_by_name(self._bcinters_cls, bctype)
-                    (be, cfg, elemap, lhs, m.group(1))
-                )
+                    # Initiate boundary interfaces
+                    bint.append(
+                        subclass_by_name(self._bcinters_cls, bctype)
+                        (be, cfg, elemap, lhs, m.group(1))
+                    )
 
-        return bint
+        return bint, vint
 
     def load_vertex(self, msh, be, cfg, rank, elemap):
         nei_vtx = {}

@@ -43,9 +43,9 @@ class CGNSZoneReader(object):
             else:
                 name = 'fluid'
                 picks = Ellipsis
-                jdx = len(bc)
+                jdx = -1
 
-            pent = pents.setdefault(name, jdx)
+            pent = pents.setdefault(name, jdx+1)
 
             elenodes.update({(k, pent): v[picks] for k, v in elenode.items()})
 
@@ -116,18 +116,52 @@ class CGNSReader(BaseReader):
         self._file = file = cgns.open(msh)
         base = cgns.base_read(file, 0)
 
-        if cgns.nzones(base) > 1:
-            raise ValueError('Only single zone is supported')
+        # Read zones and stack nodepts, pents and elenodes
+        offset = 0
+        pent = 0
+        pents = {}
+        elenodes = {}
+        for idx in  range(cgns.nzones(base)):
+            # read zone
+            zone = CGNSZoneReader(cgns, base, idx)
+            
+            ndims, nn = zone.nodepts.shape
 
-        # Read the single CGNS Zone
-        zone = CGNSZoneReader(cgns, base, 0)
+            if idx == 0:
+                # Add 1st row to start node number as 1
+                nodepts = np.zeros(ndims)[:, None]
 
-        ndims, nn = zone.nodepts.shape
-        nodepts = np.empty((nn+1, ndims))
-        nodepts[1:] = zone.nodepts.T
+            # Stack nodes
+            nodepts = np.hstack([nodepts, zone.nodepts])
 
-        elenodes = zone.elenodes
-        pents = zone.pents
+            # Collect pents and local mapping in each zone
+            pmap = {}
+            for k, v in zone.pents.items():
+                if k not in pents:
+                    pents[k] = pent
+                    pent += 1
+
+                pmap[v] = pents[k]
+
+            # Collect elenodes
+            for k, v in zone.elenodes.items():
+                # Keys as (petype and pent)
+                new = k[0], pmap[k[1]]
+
+                # Add offset for global node numbering
+                v += offset
+
+                # Stack elenodes
+                if new in elenodes:
+                    elenodes[new] = np.vstack([elenodes[new], v])
+                else:
+                    elenodes[new] = v
+
+            # Update offset of elenode for next zone
+            offset += nn
+
+        # Transpose nodepts
+        nodepts = nodepts.T
 
         # Physical entities can be divided up into:
         #  - fluid elements ('the mesh')
