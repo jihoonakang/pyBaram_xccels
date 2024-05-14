@@ -8,8 +8,6 @@ from configparser import ConfigParser, NoOptionError, NoSectionError
 import io
 import re
 
-from numpy import isin
-
 
 class INIFile:
     def __init__(self, file=None):
@@ -73,3 +71,6 @@ class INIFile:
             str = str.decode('utf-8')
 
         self._cfg.read_string(str)
+
+    def has_section(self, sect):
+        return self._cfg.has_section(sect)

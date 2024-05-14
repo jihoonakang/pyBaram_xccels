@@ -187,6 +187,17 @@ class BaseBCInters(BaseInters):
         self.be.make_loop(nface, compute_dxc)(self._dx_adj, *dx)
 
 
+class BaseVRInters(BaseInters):
+    def __init__(self, be, cfg, elemap, lhs, bctype):
+        super().__init__(be, cfg, elemap, lhs)
+        self.bctype = bctype
+
+        self._lidx = self._get_index(elemap, lhs)
+
+        # Compute face center at boundary
+        self.xf = self._get_fpts('xf', elemap, lhs)
+
+
 class BaseMPIInters(BaseInters):
     def __init__(self, be, cfg, elemap, lhs, dest):
         super().__init__(be, cfg, elemap, lhs)

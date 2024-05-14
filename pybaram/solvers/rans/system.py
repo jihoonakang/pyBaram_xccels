@@ -27,7 +27,7 @@ class RANSSystem(BaseAdvecDiffSystem):
         self.iint = self.load_int_inters(msh, be, cfg, rank, elemap)
 
         # load bc
-        self.bint = self.load_bc_inters(msh, be, cfg, rank, elemap)
+        self.bint, self.vint = self.load_bc_inters(msh, be, cfg, rank, elemap)
 
         # load mpiint
         self.mpiint = self.load_mpi_inters(msh, be, cfg, rank, elemap)

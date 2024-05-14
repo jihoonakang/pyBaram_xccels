@@ -29,8 +29,9 @@ class SurfIntPlugin(BasePlugin):
         self.ndims = ndims = intg.sys.ndims
         self._nvec = ['n{}'.format(e) for e in 'xyz'[:ndims]]
 
-        # Map as {BC type : Boundary interface objects}
+        # Map as {BC type : Boundary interface objects and Virtual interface objects}
         bcmap = {bc.bctype: bc for bc in intg.sys.bint}
+        bcmap.update({vr.bctype: vr for vr in intg.sys.vint})
 
         self._bcinfo = bcinfo = {}
         area = 0
@@ -106,13 +107,17 @@ class SurfIntPlugin(BasePlugin):
             subs.update(self._const)
             var_at = np.array([npeval(expr, subs) for expr in self._exprs])
             dist.append(var_at*nmag)
-        
-        if len(var_at.shape) > 1:
-            # Integrate vector variable 
-            integ_var = np.sum(np.hstack(dist), axis=1)
+
+        if dist:      
+            # If dist is compuated in this rank, pack data
+            if len(var_at.shape) > 1:
+                # Integrate vector variable 
+                integ_var = np.sum(np.hstack(dist), axis=1)
+            else:
+                # Not computed int this rank, give zero vector
+                integ_var = np.array([np.sum(dist)])
         else:
-            # Integrate scalar variable
-            integ_var = np.array([np.sum(dist)])
+            integ_var = np.zeros(len(self._exprs))
 
         # Collect integerated variables over all ranks
         if self._rank != 0:

@@ -84,7 +84,12 @@ class ConsAssembler(object):
         return pairs, resid
 
     def _pair_periodic_fluid_faces(self, bparts, resid, pfacespents):
+        # paired faces (same as faces)
         pfaces = defaultdict(list)
+
+        # paired bfaces (same as boundary)
+        pbfaces = defaultdict(list)
+
         nodepts = self._nodepts
 
         for lpent, rpent in pfacespents.values():
@@ -103,8 +108,10 @@ class ConsAssembler(object):
                     rf = resid.pop(tuple(sorted(rfn)))
 
                     pfaces[pftype].append([lf, rf])
+                    pbfaces[lpent].append(lf)
+                    pbfaces[rpent].append(rf)
 
-        return pfaces
+        return pfaces, pbfaces
 
     def _identify_boundary_faces(self, bparts, resid, bfacespents):
         bfaces = defaultdict(list)
@@ -130,7 +137,8 @@ class ConsAssembler(object):
         # Pair faces
         pairs, resid = self._pair_fluid_faces(faces)
 
-        ppairs = self._pair_periodic_fluid_faces(bparts, resid, pfacespents)
+        # Periodic faces
+        ppairs, pbfaces = self._pair_periodic_fluid_faces(bparts, resid, pfacespents)
 
         # Identify boundary faces
         bfaces = self._identify_boundary_faces(bparts, resid, bfacespents)
@@ -149,6 +157,11 @@ class ConsAssembler(object):
         bcon = {}
         for name, pent in bfacespents.items():
             bcon[name] = bfaces[pent]
+
+        # Virtual boundary connectivity
+        for name, (lpent, rpent) in pfacespents.items():
+            bcon['_virtual_'+name+'_l'] = pbfaces[lpent]
+            bcon['_virtual_'+name+'_r'] = pbfaces[rpent]
 
         # Output
         ret = {'con_p0': np.array(con, dtype='S4,i4,i1,i1').T}
@@ -195,8 +208,11 @@ class ConsAssembler(object):
             ridx = fuzzysort(rpts.T, range(len(rpts)))
 
             for li, ri in zip(lnodes[lidx], rnodes[ridx]):
-                vcon[li].update(vcon[li], vcon[ri])
-                vcon[ri].update(vcon[li], vcon[ri])
+                if li != ri:
+                    # Prevent duplicated vcon for periodic faces
+                    vcon[li].update(vcon[li], vcon[ri])
+                    vcon[ri] = {}
+                pass
 
     def get_vtx_connectivity(self):
         felespent, pfacespents = self._pents[0], self._pents[-1]
@@ -210,8 +226,8 @@ class ConsAssembler(object):
         vtx = chain.from_iterable([vcon[k] for k in sorted(vcon)])
         vtx = np.array(list(vtx), dtype='S4,i4,i1,i1')
 
-        # Get address
-        ivtx = np.cumsum([0] + [len(vcon[k]) for k in sorted(vcon)])
+        # Get address in terms of vertex connectivity
+        ivtx = np.cumsum([0] + [len(vcon[k]) for k in sorted(vcon) if len(vcon[k]) > 0])
 
         # Output
         ret = {'vtx_p0': vtx, 'ivtx_p0': ivtx}
