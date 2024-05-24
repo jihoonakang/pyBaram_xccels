@@ -26,8 +26,8 @@ class BaseAdvecElements(BaseElements):
         self.dsrc = np.zeros((self.nvars, self.neles))
 
         if self.order > 1:
-            # Array for gradient nad limiter
-            self.grad = grad = np.empty((self.ndims, self.nvars, self.neles))
+            # Array for gradient and limiter
+            self.grad = grad = np.zeros((self.ndims, self.nvars, self.neles))
             lim = np.ones((self.nvars, self.neles))
             limiter = self.cfg.get('solver', 'limiter', 'none')
 
