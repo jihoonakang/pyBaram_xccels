@@ -100,7 +100,7 @@ Parameterize cpu backend with
 
         * ``tbb`` --- use `Intel Threading building Blocks <https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html>`_ multi-threading layer.
 
-Examples::
+Example::
 
     [backend-cpu]
     multi-thread = parallel
@@ -120,16 +120,12 @@ Followings are the essential constant depending on the equation to solve.
 
     `float`
 
-3. CpTf --- Free-stream enthalpy . It should be defined when Sutherland law is used.
-    
-    `float`
-
-4. Pr --- Prandtl number. It should be defined for viscous simulation.
+3. Pr --- Prandtl number. It should be defined for viscous simulation.
    For conventional air, :math:`Pr=0.72`.
 
     `float`
 
-5. Prt --- Turbulent Prandtl number. It should be defined for turbulent simulation.
+4. Prt --- Turbulent Prandtl number. It should be defined for turbulent simulation.
    For conventional air, :math:`Prt=0.9`.
 
     `float`
@@ -145,9 +141,7 @@ Example::
     rhof = 1.0
     uf = %(mach)s
     pf = 1/%(gamma)s
-    mu = %(rhof)s*%(uf)s*1/%(Re)s
-    TsTref = 110.4/288.15
-    CpTf = 1 / %(gamma)s
+    mu = %(mach)s/%(Re)s
     nutf = 4*%(mu)s/%(rhof)s
 
 Solvers
@@ -202,26 +196,33 @@ Example::
     limiter = mlp-u2
     u2k = 5.0
     riemann-solver = ausmpw+
-    viscositu = sutherland
+    viscosity = sutherland
 
 [solver-viscosity-sutherland]
 *****************************
-Parameters related with Sutherland law are configured.
-Dimensional units are used to express all values.
+The parameters associated with Sutherland's law can be configured as follows:
 
-1. Tref --- reference temperature of the probelm
-
-    `float`
-
-2. Ts --- sutherland temperature. Default value is 110.4 K.
+1. muref --- Reference viscosity of the problem. See the `note <https://turbmodels.larc.nasa.gov/Papers/sutherland_notes_cfl3d_fun3d.pdf>`_
 
     `float`
 
-3. c1 --- sutherland constant. Default value is :math:`1.458\times 10^{-6}`.
+2. Tref --- Reference temperature of the problem. This is a dimensional unit.
 
     `float`
 
-With these values, the reference viscosity is computed as:
+3. CpTf --- Free-stream enthalpy.
+    
+    `float`
+
+4. Ts --- Sutherland temperature. This is a dimensional unit. Default value is 110.4 K.
+
+    `float`
+
+5. c1 --- Sutherland constant. This is a dimensional unit. Default value is :math:`1.458\times 10^{-6}`.
+
+    `float`
+
+If muref is not provided, the reference viscosity is computed using the following formula:
 
 .. math::
     \mu_{\infty} = \frac{C_1 T_{\infty}^{3/2}}{T_{\infty} + T_s}
@@ -229,7 +230,9 @@ With these values, the reference viscosity is computed as:
 Example::
 
     [solver-viscosity-sutherland]
+    muref = mu
     Tref = 300
+    CpTf = 1 / (gamma -1)*pf/rhof
     Ts = 110.4
     c1 = 1.458e-6
 
@@ -362,15 +365,24 @@ Non-dimensionlization
 The following approach is recommended:
 
 .. math::    
-    \rho^* = \frac{\rho}{\rho_{\infty}}, u^* = \frac{u}{a_{\infty}}, p^*=\frac{p}{\rho_{\infty} a_{\infty}^2}, T^*=\frac{T}{T_{\infty}}
+    \rho^* = \frac{\rho}{\rho_{\infty}}, u^* = \frac{u}{a_{\infty}}, p^*=\frac{p}{\rho_{\infty} a_{\infty}^2}, h^*=\frac{h}{a_{\infty}^2}
 
-For free-stream, the non-dimensionalized values can be written as follows:
+Here, :math:`\rho`, :math:`u`, and :math:`p` denote the density, velocity, and pressure, respectively. :math:`a` denotes the speed of sound, and :math:`h` denotes the specific enthalpy.
+
+For the free-stream, the non-dimensionalized values can be written as follows:
 
 .. math::
-    \rho^*_{\infty}=1, u^*_{\infty}=M_{\infty}, p^*_{\infty}=\frac{1}{\gamma}, T^*_{\infty}=1.
+    \rho^*_{\infty}=1, u^*_{\infty}=M_{\infty}, p^*_{\infty}=\frac{1}{\gamma}, h^*_{\infty}=\frac{1}{\gamma-1}.
 
-The normalized viscosity :math:`\mu_{\infty}^*` is chosen to satisfiy Reynolds number. 
-The Sutherland law is computed as
+The normalized free-stream viscosity :math:`\mu_{\infty}^*` is chosen to satisfy Reynolds number :math:`Re_L` based on the characteristic length :math:`L`. 
+
+.. math::
+    Re_L = \frac{\rho_{\infty} u_{\infty} L}{\mu_{\infty}} = \frac{\rho^*_{\infty} u^*_{\infty} L^*}{\mu^*_{\infty}} \\
+    \mu_{\infty}^* = \frac{M_{\infty}}{Re_L} L^* 
+
+where :math:`M_{\infty}` denotes free-stream Mach number. :math:`L^*` is the non-dimnensionalized characteristic length (i.e., the chord length in the mesh.)
+
+The the viscosity can be calulated via Sutherland law as:
 
 .. math::
     \mu^* = \mu_{\infty}^* (T^*)^{3/2} \frac{1+T_s / T_{\infty}}{T^* + T_s / T_{\infty}}.
@@ -413,7 +425,7 @@ The details of type and required variables are summarized as follows.
 
 * ``isotherm-wall`` --- isothermal wall boundary condition.
 
-    * ``cptw`` --- wall enthalpy 
+    * ``CpTw`` --- wall enthalpy 
 
 * ``sup-out`` --- supersonic outlet boundary condition
 
@@ -437,7 +449,7 @@ The details of type and required variables are summarized as follows.
 
     * ``p0`` --- total pressure
 
-    * ``Cpt0`` --- total enthalpy
+    * ``CpT0`` --- total enthalpy
 
     * ``dir`` --- velocity direction components.
 
