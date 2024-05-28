@@ -32,24 +32,34 @@ class ViscousFluidElements(FluidElements):
             gamma, pmin = self._const['gamma'], self._const['pmin']
             ndims, nfvars = self.ndims, self.nfvars
 
-            # Minimum value of total enthalpy
-            Hmin = gamma/(gamma-1)*pmin
+            # Minimum value of enthalpy
+            Hmin = gamma/(gamma-1)*pmin               
 
-            # Free-stream enthalpy
-            try:
-                CpTf = self._const['cptf']
-            except:
-                KeyError("Free-stream enthalpy is not given (CpTf)")
-
-            # Reference viscosity by Sutherland Law (Dimensional unit!)
             # All default values are given in MKS units.
             sect = 'solver-viscosity-sutherland'
-            c1 = npeval(self.cfg.getexpr(sect, 'c1', self._const, 1.458e-6))
             Ts = npeval(self.cfg.getexpr(sect, 'Ts', self._const, 110.4))
             Tref = npeval(self.cfg.getexpr(sect, 'Tref', self._const, 288.15))
 
-            # Compute Viscosity
-            muref = c1 * Tref**1.5 / (Tref + Ts)
+            # Get reference viscosity
+            muref_expr = self.cfg.getexpr(sect, 'muref', self._const)
+            if muref_expr == 'none':
+                # If mu_ref is not given, calculate from Sutherland Law
+                c1 = npeval(self.cfg.getexpr(sect, 'c1', self._const, 1.458e-6))
+                muref = c1 * Tref**1.5 / (Tref + Ts)
+            else:
+                try:
+                    muref = npeval(muref_expr)
+                except:
+                    raise ValueError("Invalid reference viscosty: {}".fromat(muref_expr))
+                
+            # Free-stream enthalpy
+            CpTf = self.cfg.getexpr(sect, 'cptf', self._const,'none')
+            if CpTf == 'none':
+                KeyError("Free-stream enthalpy is not given (CpTf)")
+            else:
+                CpTf = npeval(CpTf)
+
+            # Non-dimensionalized Ts
             TsTref = Ts/Tref
 
             def compute_mu(u):
@@ -65,7 +75,7 @@ class ViscousFluidElements(FluidElements):
                 # Temperature ratio
                 Tratio = CpT / CpTf
 
-                # Sutherland Law
+                # Sutherland Law (non-dimensionalized form)
                 return muref*Tratio**1.5*(1 + TsTref) / (Tratio + TsTref)
                 
         else:
