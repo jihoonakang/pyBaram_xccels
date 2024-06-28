@@ -34,7 +34,7 @@ class SurfIntPlugin(BasePlugin):
         bcmap.update({vr.bctype: vr for vr in intg.sys.vint})
 
         self._bcinfo = bcinfo = {}
-        area = 0
+        area = 0.0
 
         if suffix in bcmap:
             # Get normal vector and element index for bc
