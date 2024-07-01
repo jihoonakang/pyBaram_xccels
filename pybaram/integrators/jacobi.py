@@ -2,72 +2,84 @@ from pybaram.utils.nb import dot
 import numpy as np
 
 
-def make_jacobi_update(nv):
+def make_jacobi_update(ele):
+    # Number of variables
+    nvars = ele.nvars
+
     # Update next time step solution
-    def _update(i_begin, i_end, uptsb, dub):
+    def _update(i_begin, i_end, uptsb, dub, subres):
         for idx in range(i_begin, i_end):
-            for kdx in range(nv[0], nv[1]):
+            for kdx in range(nvars):
+                # Update solution by adding residual
                 uptsb[kdx, idx] += dub[kdx, idx]
+
+                # Initialize dub array
+                dub[kdx, idx] = 0.0
+            
+            # Initialize subres array
+            subres[idx] = 0.0
 
     return _update
 
 
-def make_jacobi_common(be, ele, nv, _jacobian, _dsrc=None, factor=1.0):
+def make_pre_jacobi(ele, nv, factor=1.0):
     # Number of faces
     nface = ele.nface
 
     # Number of variables
     dnv = nv[1] - nv[0]
 
-    # Normal vectors at faces and displacement from cell center to neighbor cells
-    fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
-    dxc = np.linalg.norm(ele.dxc, axis=2)
+    # Normal vectors at faces
+    fnorm_vol = ele.mag_fnorm * ele.rcp_vol
 
-    # Gradient at cell
-    grad = ele.grad
-
-    # Temporal 2D array
-    matrix = be.local_matrix()
-
-    def _pre_jacobi(i_begin, i_end, uptsb, dt, diag, mu=None, mut=None):
-        # Compute digonal matrix
+    def _pre_diag(i_begin, i_end, dt, diag, fjmat):
+        # Compute diagonal matrix
         for idx in range(i_begin, i_end):
             diag[:, :, idx] = 0.0
-            u = uptsb[:, idx]
-            gf = grad[:, :, idx]
-            ap = matrix(dnv*dnv, (dnv, dnv))
 
-            # Computes diagonal matrix based on neighbor cells
-            for jdx in range(nface):                
-                dx = dxc[jdx, idx]
-                nf = vec_fnorm[jdx, :, idx]
-
-                _jacobian(u, nf, ap, gf, idx, mu, dx, mut)
-                for row in range(dnv):
-                    for col in range(dnv):
-                        diag[row, col, idx] += ap[row][col]*fnorm_vol[jdx, idx]
+            for jdx in range(nface):
+                diag[:, :, idx] += fjmat[0, :, :, jdx, idx]*fnorm_vol[jdx, idx]
             
-            # Derivative of source term for turbulence model
-            if _dsrc is not None:
-                _dsrc(ap, idx, u)
-                for row in range(dnv):
-                    for col in range(dnv):
-                        diag[row, col, idx] += ap[row][col]
-            
-            # Complete implicit operator
             for kdx in range(dnv):
                 diag[kdx, kdx, idx] += 1/(dt[idx]*factor)
             
-            # Compute inverse
             diag[:, :, idx] = np.linalg.inv(diag[:, :, idx])
+
+    return _pre_diag
+
+
+def make_tpre_jacobi(ele, nv, dsrc, factor):
+    # Number of faces
+    nface = ele.nface
+
+    # Number of variables
+    dnv = nv[1] - nv[0]
+
+    # Normal vectors at faces
+    fnorm_vol = ele.mag_fnorm * ele.rcp_vol
     
-    return _pre_jacobi
+    def _pre_tdiag(i_begin, i_end, uptsb, dt, tdiag, tfjmat):
+        for idx in range(i_begin, i_end):
+            tdiag[:, :, idx] = 0.0
+            u = uptsb[:, idx]
+
+            for jdx in range(nface):
+                tdiag[:, :, idx] += tfjmat[0, :, :, jdx, idx]*fnorm_vol[jdx, idx]
+            
+            # Source term Jacobian
+            dsrc(u, tdiag[:, :, idx], idx)
+
+            for kdx in range(dnv):
+                tdiag[kdx, kdx, idx] += 1/(dt[idx]*factor)
+
+            tdiag[:, :, idx] = np.linalg.inv(tdiag[:, :, idx])
+
+    return _pre_tdiag
 
 
-def make_jacobi_sweep(be, ele, nv, _jacobian):
+def make_jacobi_sweep(be, ele, nv, fdx=1, res_idx=0):
     # Make local array
     array = be.local_array()
-    matrix = be.local_matrix()
 
     # Get element attributes
     nface = ele.nface
@@ -77,54 +89,52 @@ def make_jacobi_sweep(be, ele, nv, _jacobian):
     nei_ele = ele.nei_ele
 
     # Normal vectors at faces
-    fnorm_vol, vec_fnorm = ele.mag_fnorm * ele.rcp_vol, ele.vec_fnorm
-    dxc = np.linalg.norm(ele.dxc, axis=2)
+    fnorm_vol= ele.mag_fnorm * ele.rcp_vol
 
-    # Gradient at cell
-    grad = ele.grad
-
-    def _jacobi_sweep(i_begin, i_end, uptsb, rhsb, dub, rod, mu=None, mut=None):
+    def _jacobi_sweep(i_begin, i_end, rhsb, dub, rod, fjmat):
         # Compute R-(L+U)x
         for idx in range(i_begin, i_end):
             rhs = array(dnv)
-            am = matrix(dnv*dnv, (dnv, dnv))
 
             # Initialize rhs array with RHS
-            for k in range(dnv):
-                rhs[k] = rhsb[k+nv[0], idx]
+            for kdx in range(dnv):
+                rhs[kdx] = rhsb[kdx+nv[0], idx]
 
             # Computes Jacobian matrix based on neighbor cells
             for jdx in range(nface):
                 neib = nei_ele[jdx, idx]
-                dx = dxc[jdx, idx]
-                
+
                 if neib != idx:
-                    nf = vec_fnorm[jdx, :, idx]
-                    gf = grad[:, :, neib]
-                    
-                    _jacobian(uptsb[:, neib], nf, am, gf, neib, mu, dx, mut)
-                    for k in range(dnv):
-                        rhs[k] -= dot(am[k], dub[:, neib], dnv, 0, nv[0])*fnorm_vol[jdx, idx]
+                    neimat = fjmat[fdx, :, :, jdx, idx]
+
+                    for kdx in range(dnv):
+                        rhs[kdx] += dot(neimat[kdx, :], dub[:, neib], dnv, 0, nv[0]) \
+                                    * fnorm_vol[jdx, idx]
 
             # Allocates to each rod array
-            for k in range(dnv):
-                rod[k+nv[0], idx] = rhs[k]
+            for kdx in range(dnv):
+                rod[kdx+nv[0], idx] = rhs[kdx]
         
-    def _jacobi_compute(i_begin, i_end, dub, rod, diag, subres=None):
+    def _jacobi_compute(i_begin, i_end, dub, rod, diag, subres=None, norm=None):
         # Compute Ax = b
         for idx in range(i_begin, i_end):
             rhs = array(dnv)
 
             # Reallocate rod element value to rhs array
-            for k in range(dnv):
-                rhs[k] = rod[k+nv[0], idx]
+            for kdx in range(dnv):
+                rhs[kdx] = rod[kdx+nv[0], idx]
             
             # Inner-update dub array
             for kdx in range(dnv):
                 dub[kdx+nv[0], idx] = dot(diag[kdx, :, idx], rhs, dnv)
 
-            # Save rho error
+            # Save error
             if subres is not None:
-                subres[idx] = abs(dub[0, idx])
+                norm[idx] = (dub[res_idx, idx] - subres[idx])**2
+
+                # Save sub-residual of previous step
+                subres[idx] = dub[res_idx, idx]
 
     return _jacobi_sweep, _jacobi_compute
+
+

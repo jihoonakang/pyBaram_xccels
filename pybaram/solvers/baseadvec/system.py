@@ -100,6 +100,17 @@ class BaseAdvecSystem(BaseSystem):
         if self.mpiint:
             self.mpiint.compute_spec_rad()
 
+    def approx_jac(self):
+        # Compute solution at flux point (face center)
+        self.eles.compute_fpts()
+
+        # Compute approximate Jacobian matrix on faces
+        self.iint.compute_aprx_jac()
+        self.bint.compute_aprx_jac()
+
+        if self.mpiint:
+            self.mpiint.compute_aprx_jac()
+
     def timestep(self, cfl, idx_in=0):
         # Compute time step with the given CFL number
         self.eles.upts_in.idx = idx_in

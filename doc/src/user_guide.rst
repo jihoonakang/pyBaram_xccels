@@ -265,7 +265,7 @@ Time integration (or relaxation) schemes and related parameters are configured.
 
    For steady simulation, following options can be selected.
 
-    ``eulerexplicit`` | ``tvd-rk3`` | ``rk5`` | ``lu-sgs`` | ``colored-lu-sgs`` | ``jacobi``
+    ``eulerexplicit`` | ``tvd-rk3`` | ``rk5`` | ``lu-sgs`` | ``colored-lu-sgs`` | ``jacobi`` | ``blu-sgs`` | ``colored-blu-sgs``
 
     * ``lu-sgs`` --- This scheme works only if disabling multi-threading layer (``single``).
 
@@ -303,8 +303,16 @@ Time integration (or relaxation) schemes and related parameters are configured.
 
     `float`
 
-14. visflux-jacobian --- The computing type of viscous jacobian matrix for jacobi method.
-    There are two options, ``tlns`` (Thin-layer Navier-Stokes) and ``exact``. The default type is tlns.
+14. visflux-jacobian --- The computing type of viscous jacobian matrix for several implicit methods.
+    There are three options, ``tlns``, ``approximate``, and ``none``.
+
+    * ``tlns`` --- Based on Thin Layer Navier-Stokes equation (TLNS). Default.
+
+    * ``approximate`` --- Based on Spectral radius. This type computes diagonal elements only.
+
+    * ``none`` --- No viscous flux Jacobian imported. This type can cause convergence delay.
+
+    * Applicable methods --- ``jacobi``, ``blu-sgs``, ``colored-blu-sgs``
 
     `string`
 
