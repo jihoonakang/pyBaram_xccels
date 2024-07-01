@@ -20,6 +20,11 @@ class EulerIntInters(BaseAdvecIntInters):
             nele = len(fpts)
             fspr = [cell.fspr for cell in elemap.values()]
             self.compute_spec_rad = Kernel(self._make_spec_rad(nele), *fpts, *fspr)
+        elif impl_op == 'approx-jacobian':
+            # Kernel to compute Jacobian matrices
+            nele = len(fpts)
+            fjmat = [cell.jmat for cell in elemap.values()]
+            self.compute_aprx_jac = Kernel(self._make_aprx_jac(nele), *fpts, *fjmat)
 
     def _make_flux(self):
         ndims, nfvars = self.ndims, self.nfvars
@@ -97,6 +102,61 @@ class EulerIntInters(BaseAdvecIntInters):
                 lam[rti][rfi, rei] = lami
 
         return self.be.make_loop(self.nfpts, comm_spr)
+    
+
+    def _make_aprx_jac(self, nele):
+        from pybaram.solvers.euler.jacobian import make_convective_jacobian
+
+        nfvars = self.nfvars
+
+        lt, le, lf = self._lidx
+        rt, re, rf = self._ridx
+        nf = self._vec_snorm
+
+        cplargs = {
+            'ndims': self.ndims,
+            'gamma': self.ele0._const['gamma'],
+            'to_prim': self.ele0.to_flow_primevars()
+        }
+
+        # Get Jacobian functions
+        pos_jacobian = make_convective_jacobian(self.be, cplargs, 'positive')
+        neg_jacobian = make_convective_jacobian(self.be, cplargs, 'negative')
+
+        # Temporal matrix
+        matrix = self.be.local_matrix()
+
+        def comm_apj(i_begin, i_end, *ufj):
+            uf, jmats = ufj[:nele], ufj[nele:]
+
+            for idx in range(i_begin, i_end):
+                # Normal vector
+                nfi = nf[:, idx]
+
+                # Jacobian matrix
+                ap = matrix(nfvars*nfvars, (nfvars, nfvars))
+                am = matrix(nfvars*nfvars, (nfvars, nfvars))
+
+                # Left and right solutions
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                rti, rfi, rei = rt[idx], rf[idx], re[idx]
+                ul = uf[lti][lfi, :, lei]
+                ur = uf[rti][rfi, :, rei]
+
+                # Compute Jacobian matrix on surface
+                # based on left/right cell
+                pos_jacobian(ul, nfi, ap)
+                neg_jacobian(ur, nfi, am)
+
+                # Compute approximate Jacobian on face
+                for row in range(nfvars):
+                    for col in range(nfvars):
+                        jmats[lti][0, row, col, lfi, lei] = ap[row][col]
+                        jmats[lti][1, row, col, lfi, lei] = -am[row][col]
+                        jmats[rti][0, row, col, rfi, rei] = -am[row][col]
+                        jmats[rti][1, row, col, rfi, rei] = ap[row][col]
+
+        return self.be.make_loop(self.nfpts, comm_apj)
 
 
 class EulerMPIInters(BaseAdvecMPIInters):
@@ -112,6 +172,11 @@ class EulerMPIInters(BaseAdvecMPIInters):
             nele = len(fpts)
             fspr = [cell.fspr for cell in elemap.values()]
             self.compute_spec_rad = Kernel(self._make_spec_rad(nele), *fpts, *fspr)
+        elif impl_op == 'approx-jacobian':
+            # Kernel to compute Jacobian matrices
+            nele = len(fpts)
+            fjmat = [cell.jmat for cell in elemap.values()]
+            self.compute_aprx_jac = Kernel(self._make_aprx_jac(nele), *fpts, *fjmat)
 
     def _make_flux(self):
         ndims, nfvars = self.ndims, self.nfvars
@@ -178,6 +243,47 @@ class EulerMPIInters(BaseAdvecMPIInters):
 
         return self.be.make_loop(self.nfpts, comm_spr)
 
+    def _make_aprx_jac(self, nele):
+        from pybaram.solvers.euler.jacobian import make_convective_jacobian
+        
+        nfvars = self.nfvars
+
+        lt, le, lf = self._lidx
+        nf = self._vec_snorm
+
+        cplargs = {
+            'ndims': self.ndims,
+            'gamma': self.ele0._const['gamma'],
+            'to_prim': self.ele0.to_flow_primevars()
+        }
+
+        # Get Jacobian functions
+        com_aprx_jac = make_convective_jacobian(self.be, cplargs, 'positive')
+
+        # Temporal matrix
+        matrix = self.be.local_matrix()
+
+        def comm_apj(i_begin, i_end, *ufj):
+            uf, jmats = ufj[:nele], ufj[nele:]
+
+            A = matrix(nfvars*nfvars, (nfvars, nfvars))
+
+            for idx in range(i_begin, i_end):
+                # Normal vector
+                nfi = nf[:, idx]
+
+                # Left solution
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                ul = uf[lti][lfi, :, lei]
+
+                # Compute Jacobian matrix on face
+                com_aprx_jac(ul, nfi, A)
+                for row in range(nfvars):
+                    for col in range(nfvars):
+                        jmats[lti][0, row, col, lfi, lei] = A[row][col]
+
+        return self.be.make_loop(self.nfpts, comm_apj)
+
 
 class EulerBCInters(BaseAdvecBCInters):
     _get_bc = get_bc
@@ -194,6 +300,11 @@ class EulerBCInters(BaseAdvecBCInters):
             nele = len(fpts)
             fspr = [cell.fspr for cell in elemap.values()]
             self.compute_spec_rad = Kernel(self._make_spec_rad(nele), *fpts, *fspr)
+        elif impl_op == 'approx-jacobian':
+            # Kernel to compute Jacobian matrices
+            nele = len(fpts)
+            fjmat = [cell.jmat for cell in elemap.values()]
+            self.compute_aprx_jac = Kernel(self._make_aprx_jac(nele), *fpts, *fjmat)
 
     def _make_flux(self):
         ndims, nfvars = self.ndims, self.nfvars
@@ -266,6 +377,47 @@ class EulerBCInters(BaseAdvecBCInters):
                 lam[lti][lfi, lei] = lami
 
         return self.be.make_loop(self.nfpts, comm_spr)
+    
+    def _make_aprx_jac(self, nele):
+        from pybaram.solvers.euler.jacobian import make_convective_jacobian
+        
+        nfvars = self.nfvars
+
+        lt, le, lf = self._lidx
+        nf = self._vec_snorm
+
+        cplargs = {
+            'ndims': self.ndims,
+            'gamma': self.ele0._const['gamma'],
+            'to_prim': self.ele0.to_flow_primevars()
+        }
+
+        # Get Jacobian functions
+        pos_jacobian = make_convective_jacobian(self.be, cplargs, 'positive')
+
+        # Temporal matrix
+        matrix = self.be.local_matrix()
+
+        def comm_apj(i_begin, i_end, *ufj):
+            uf, jmats = ufj[:nele], ufj[nele:]
+
+            A = matrix(nfvars*nfvars, (nfvars, nfvars))
+
+            for idx in range(i_begin, i_end):
+                # Normal vector
+                nfi = nf[:, idx]
+
+                # Left solution
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                ul = uf[lti][lfi, :, lei]
+
+                # Compute Jacobian matrix on face
+                pos_jacobian(ul, nfi, A)
+                for row in range(nfvars):
+                    for col in range(nfvars):
+                        jmats[lti][0, row, col, lfi, lei] = A[row][col]
+
+        return self.be.make_loop(self.nfpts, comm_apj)
 
 
 class EulerSupOutBCInters(EulerBCInters):

@@ -225,39 +225,45 @@ class RANSKWSSTElements(RANSElements, RANSKWSSTFluidElements):
     def make_turb_jacobian(self):
         from pybaram.solvers.ranskwsst.turbulent import make_blendingF1
 
+        # Constants
         cplargs = {'ndims': self.ndims, 'nvars': self.nvars, **self._turb_coeffs}
-        nvars = self.nvars
-        betast = self._turb_coeffs['betast']
+        ndims = self.ndims
         sigmak1 = self._turb_coeffs['sigmak1']
         sigmak2 = self._turb_coeffs['sigmak2']
         sigmaw1 = self._turb_coeffs['sigmaw1']
         sigmaw2 = self._turb_coeffs['sigmaw2']
 
-        dsrc = self.dsrc
-        d = self.ydist
+        # Functions
         _f1 = make_blendingF1(self.be, cplargs)
         
         # Compute turbulence Jacobian
-        def _jacobian(uf, nf, A, gf, idx, mu, dx, mut):
-            mui, muti, di = mu[idx], mut[idx], d[idx]
-            f1 = _f1(uf, gf, mui, di)
+        def _jacobian(um, nf, A, rcp_dx, mu, mut, gf, ydnsi):
+            f1 = _f1(um, gf, mu, ydnsi)
             sigk = f1*sigmak1 + (1-f1)*sigmak2
             sigw = f1*sigmaw1 + (1-f1)*sigmaw2
-            rho = uf[0]
+            
+            rho = um[0]
+            contra = dot(um, nf, ndims, 1)/rho
 
-            A[0][0] = (mui + sigk*muti)/rho
+            A[0][0] = abs(contra) + rcp_dx*(mu + sigk*mut)/rho
             A[0][1] = 0.0
             A[1][0] = 0.0
-            A[1][1] = (mui + sigw*muti)/rho
+            A[1][1] = abs(contra) + rcp_dx*(mu + sigw*mut)/rho
 
-        # Compute Jacobian of source term
-        def _dsrc(A, idx, uf):
+        return self.be.compile(_jacobian)
+
+    def make_source_jacobian(self):
+        nvars = self.nvars
+        betast = self._turb_coeffs['betast']
+        dsrc = self.dsrc
+
+        def _dsrc(uf, A, idx):
             rho = uf[0]
             k = uf[nvars-2]/rho
 
-            A[0][0] = dsrc[nvars-2][idx]
-            A[0][1] = betast*k
-            A[1][0] = 0.0
-            A[1][1] = dsrc[nvars-1][idx]
+            A[0][0] += dsrc[nvars-2][idx]
+            A[0][1] += max(betast*k, 0)
+            # A[1][0] += 0.0
+            A[1][1] += dsrc[nvars-1][idx]
 
-        return self.be.compile(_jacobian), self.be.compile(_dsrc)
+        return self.be.compile(_dsrc)

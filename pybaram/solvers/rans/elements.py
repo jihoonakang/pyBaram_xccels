@@ -32,9 +32,15 @@ class RANSElements(BaseAdvecDiffElements):
         self.mu, self.mut = aux[1], aux[2]
 
         if impl_op == 'spectral-radius':
-            # Spectral radius (flow and turbuelnt model)
+            # Spectral radius (flow and turbulent model)
             self.fspr = np.empty((self.nface, self.neles))
             self.tfspr = np.empty_like(self.fspr)
+        elif impl_op == 'approx-jacobian':
+            # Jacobian matrix (flow and turbulent model)
+            self.jmat = np.empty((2, self.nfvars, self.nfvars, \
+                                  self.nface, self.neles))
+            self.tjmat = np.empty((1, self.nturbvars, self.nturbvars, \
+                                   self.nface, self.neles))
 
         # Update arguments of post kerenl
         self.post.update_args(self.upts_in, self.grad, self.mu, self.mut)

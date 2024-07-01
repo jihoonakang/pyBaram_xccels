@@ -198,16 +198,25 @@ class RANSSAElements(RANSElements, RANSSAFluidElements):
         return self.be.compile(_lambdaf)
 
     def make_turb_jacobian(self):
+        ndims, nvars = self.ndims, self.nvars
+        sigma = self._turb_coeffs['sigma']
+
+        # Compute turbulence Jacobian
+        def _jacobian(um, nf, A, rcp_dx, mu, *args):
+            rho = um[0]
+            contra = dot(um, nf, ndims, 1)/rho
+            nu = mu/rho
+            nut = um[nvars-1]
+
+            A[0][0] = abs(contra) + rcp_dx*(nu + nut)/sigma
+
+        return self.be.compile(_jacobian)
+    
+    def make_source_jacobian(self):
         nvars = self.nvars
         dsrc = self.dsrc
-        wave_speed = self.make_turb_wave_speed()
+
+        def _dsrc(uf, A, idx):
+            A[0][0] += dsrc[nvars-1][idx]
         
-        # Compute turbulence Jacobian
-        def _jacobian(uf, nf, A, gf, idx, mu, dx, *args):
-            A[0][0] = wave_speed(uf, nf, dx, idx, mu)
-        
-        # Compute Jacobian of source term
-        def _dsrc(A, idx, *args):
-            A[0][0] = dsrc[nvars-1][idx]
-        
-        return self.be.compile(_jacobian), self.be.compile(_dsrc)
+        return self.be.compile(_dsrc)

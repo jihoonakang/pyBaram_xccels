@@ -31,6 +31,12 @@ class RANSIntInters(BaseAdvecDiffIntInters):
             fspr = [cell.fspr for cell in elemap.values()]
             tfspr = [cell.tfspr for cell in elemap.values()]
             self.compute_spec_rad = Kernel(self._make_spec_rad(nele), muf, *fpts, *fspr, *tfspr)
+        elif impl_op == 'approx-jacobian':
+            # Kernel to compute Jacobian matrices
+            nele = len(fpts)
+            fjmat = [cell.jmat for cell in elemap.values()]
+            tfjmat = [cell.tjmat for cell in elemap.values()]
+            self.compute_aprx_jac = Kernel(self._make_aprx_jac(nele), muf, gradf, *fpts, *fjmat, *tfjmat)
 
     def _make_flux(self):
         ndims, nvars, nfvars = self.ndims, self.nvars, self.nfvars
@@ -155,6 +161,96 @@ class RANSIntInters(BaseAdvecDiffIntInters):
                 tlam[rti][rfi, rei] = tlami
 
         return self.be.make_loop(self.nfpts, comm_spr)
+    
+    def _make_aprx_jac(self, nele):
+        from pybaram.solvers.euler.jacobian import make_convective_jacobian
+        from pybaram.solvers.navierstokes.jacobian import get_viscous_jacobian
+
+        nvars, nfvars = self.nvars, self.nfvars
+        ntvars = nvars - nfvars
+
+        # Left and right indices
+        lt, le, lf = self._lidx
+        rt, re, rf = self._ridx
+        nf = self._vec_snorm
+        ydist = self.ydist
+        
+        # reciprocal of distance between two cells
+        rcp_dx = self._rcp_dx
+
+        cplargs = {
+            'ndims': self.ndims,
+            'nfvars': self.nfvars,
+            'gamma': self.ele0._const['gamma'],
+            'pr': self.ele0._const['pr'],
+            'to_prim': self.ele0.to_flow_primevars()
+        }
+
+        # Get viscous Jacobian type
+        vistype = self.cfg.get('solver-time-integrator', 'visflux-jacobian', 'tlns')
+
+        # Get Jacobian functions
+        pos_jacobian = make_convective_jacobian(self.be, cplargs, 'positive')
+        neg_jacobian = make_convective_jacobian(self.be, cplargs, 'negative')
+        vis_jacobian = get_viscous_jacobian(vistype, self.be, cplargs)
+        turb_jacobian = self.ele0.make_turb_jacobian()
+
+        # Temporal array & matrix
+        array = self.be.local_array()
+        matrix = self.be.local_matrix()
+
+        def comm_apj(i_begin, i_end, muf, gradf, *ufj):
+            uf, _jmats = ufj[:nele], ufj[nele:]
+            jmats, tjmats = _jmats[:nele], _jmats[nele:]
+
+            for idx in range(i_begin, i_end):
+                um = array(nvars)
+                ap = matrix(nfvars*nfvars, (nfvars, nfvars))
+                am = matrix(nfvars*nfvars, (nfvars, nfvars))
+                at = matrix(ntvars*ntvars, (ntvars, ntvars))
+
+                # Normal vector
+                nfi = nf[:, idx]
+                rcp_dxi = rcp_dx[idx]
+
+                # Left and right solutions
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                rti, rfi, rei = rt[idx], rf[idx], re[idx]
+                ul = uf[lti][lfi, :, lei]
+                ur = uf[rti][rfi, :, rei]
+
+                # Get viscosity on face (saved at rhside)
+                mu = muf[0, idx]
+                mut = muf[1, idx]
+
+                # Compute Jacobian matrix on surface
+                # based on left/right cell
+                pos_jacobian(ul, nfi, ap)
+                neg_jacobian(ur, nfi, am)
+
+                vis_jacobian(ul, nfi, ap, mu, rcp_dxi, 1.0)
+                vis_jacobian(ur, nfi, am, mu, rcp_dxi, -1.0)
+
+                for row in range(nfvars):
+                    for col in range(nfvars):
+                        jmats[lti][0, row, col, lfi, lei] = ap[row][col]
+                        jmats[lti][1, row, col, lfi, lei] = -am[row][col]
+                        jmats[rti][0, row, col, rfi, rei] = -am[row][col]
+                        jmats[rti][1, row, col, rfi, rei] = ap[row][col]
+                
+                # Turbulent Jacobian
+                gf = gradf[:, :, idx]
+                ydnsi = ydist[idx]
+                for jdx in range(nvars):
+                    um[jdx] = 0.5*(ul[jdx] + ur[jdx])
+                
+                turb_jacobian(um, nfi, at, rcp_dxi, mu, mut, gf, ydnsi)
+                for row in range(ntvars):
+                    for col in range(ntvars):
+                        tjmats[lti][0, row, col, lfi, lei] = at[row][col]
+                        tjmats[rti][0, row, col, rfi, rei] = at[row][col]
+
+        return self.be.make_loop(self.nfpts, comm_apj)
 
 
 class RANSMPIInters(BaseAdvecDiffMPIInters):
@@ -180,6 +276,12 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
             fspr = [cell.fspr for cell in elemap.values()]
             tfspr = [cell.tfspr for cell in elemap.values()]
             self.compute_spec_rad = Kernel(self._make_spec_rad(nele), muf, *fpts, *fspr, *tfspr)
+        elif impl_op == 'approx-jacobian':
+            # Kernel to compute Jacobian matrices
+            nele = len(fpts)
+            fjmat = [cell.jmat for cell in elemap.values()]
+            tfjmat = [cell.tjmat for cell in elemap.values()]
+            self.compute_aprx_jac = Kernel(self._make_aprx_jac(nele), muf, gradf, *fpts, *fjmat, *tfjmat)
 
     def _make_flux(self):
         ndims, nvars, nfvars = self.ndims, self.nvars, self.nfvars
@@ -285,6 +387,80 @@ class RANSMPIInters(BaseAdvecDiffMPIInters):
                 tlam[lti][lfi, lei] = tlami
 
         return self.be.make_loop(self.nfpts, comm_spr)
+    
+    def _make_aprx_jac(self, nele):
+        from pybaram.solvers.euler.jacobian import make_convective_jacobian
+        from pybaram.solvers.navierstokes.jacobian import get_viscous_jacobian
+
+        nvars, nfvars = self.nvars, self.nfvars
+        ntvars = nvars - nfvars
+
+        # Left and right indices
+        lt, le, lf = self._lidx
+        nf = self._vec_snorm
+        ydist = self.ydist
+        
+        # reciprocal of distance between two cells
+        rcp_dx = self._rcp_dx
+
+        cplargs = {
+            'ndims': self.ndims,
+            'nfvars': self.nfvars,
+            'gamma': self.ele0._const['gamma'],
+            'pr': self.ele0._const['pr'],
+            'to_prim': self.ele0.to_flow_primevars()
+        }
+
+        # Get viscous Jacobian type
+        vistype = self.cfg.get('solver-time-integrator', 'visflux-jacobian', 'tlns')
+
+        # Get Jacobian functions
+        pos_jacobian = make_convective_jacobian(self.be, cplargs, 'positive')
+        vis_jacobian = get_viscous_jacobian(vistype, self.be, cplargs)
+        turb_jacobian = self.ele0.make_turb_jacobian()
+
+        # Temporal matrix
+        matrix = self.be.local_matrix()
+
+        def comm_apj(i_begin, i_end, muf, gradf, *ufj):
+            uf, _jmats = ufj[:nele], ufj[nele:]
+            jmats, tjmats = _jmats[:nele], _jmats[nele:]
+
+            for idx in range(i_begin, i_end):
+                ap = matrix(nfvars*nfvars, (nfvars, nfvars))
+                at = matrix(ntvars*ntvars, (ntvars, ntvars))
+
+                # Normal vector
+                nfi = nf[:, idx]
+                rcp_dxi = rcp_dx[idx]
+
+                # Left and right solutions
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                ul = uf[lti][lfi, :, lei]
+
+                # Get viscosity on face (saved at rhside)
+                mu = muf[0, idx]
+                mut = muf[1, idx]
+
+                # Compute Jacobian matrix on surface
+                # based on left/right cell
+                pos_jacobian(ul, nfi, ap)
+                vis_jacobian(ul, nfi, ap, mu, rcp_dxi, 1.0)
+
+                for row in range(nfvars):
+                    for col in range(nfvars):
+                        jmats[lti][0, row, col, lfi, lei] = ap[row][col]
+                
+                # Turbulent Jacobian
+                gf = gradf[:, :, idx]
+                ydnsi = ydist[idx]
+                
+                turb_jacobian(ul, nfi, at, rcp_dxi, mu, mut, gf, ydnsi)
+                for row in range(ntvars):
+                    for col in range(ntvars):
+                        tjmats[lti][0, row, col, lfi, lei] = at[row][col]
+
+        return self.be.make_loop(self.nfpts, comm_apj)
 
 
 class RANSBCInters(BaseAdvecDiffBCInters):
@@ -331,6 +507,12 @@ class RANSBCInters(BaseAdvecDiffBCInters):
             fspr = [cell.fspr for cell in elemap.values()]
             tfspr = [cell.tfspr for cell in elemap.values()]
             self.compute_spec_rad = Kernel(self._make_spec_rad(nele), muf, *fpts, *fspr, *tfspr)
+        elif impl_op == 'approx-jacobian':
+            # Kernel to compute Jacobian matrices
+            nele = len(fpts)
+            fjmat = [cell.jmat for cell in elemap.values()]
+            tfjmat = [cell.tjmat for cell in elemap.values()]
+            self.compute_aprx_jac = Kernel(self._make_aprx_jac(nele), muf, gradf, *fpts, *fjmat, *tfjmat)
 
     def _make_delu(self):
         nvars, ndims = self.nvars, self.ndims
@@ -476,6 +658,80 @@ class RANSBCInters(BaseAdvecDiffBCInters):
                 tlam[lti][lfi, lei] = tlami
 
         return self.be.make_loop(self.nfpts, comm_spr)
+    
+    def _make_aprx_jac(self, nele):
+        from pybaram.solvers.euler.jacobian import make_convective_jacobian
+        from pybaram.solvers.navierstokes.jacobian import get_viscous_jacobian
+
+        nvars, nfvars = self.nvars, self.nfvars
+        ntvars = nvars - nfvars
+
+        # Left and right indices
+        lt, le, lf = self._lidx
+        nf = self._vec_snorm
+        ydist = self.ydist
+        
+        # reciprocal of distance between two cells
+        rcp_dx = self._rcp_dx
+
+        cplargs = {
+            'ndims': self.ndims,
+            'nfvars': self.nfvars,
+            'gamma': self.ele0._const['gamma'],
+            'pr': self.ele0._const['pr'],
+            'to_prim': self.ele0.to_flow_primevars()
+        }
+
+        # Get viscous Jacobian type
+        vistype = self.cfg.get('solver-time-integrator', 'visflux-jacobian', 'tlns')
+
+        # Get Jacobian functions
+        pos_jacobian = make_convective_jacobian(self.be, cplargs, 'positive')
+        vis_jacobian = get_viscous_jacobian(vistype, self.be, cplargs)
+        turb_jacobian = self.ele0.make_turb_jacobian()
+
+        # Temporal matrix
+        matrix = self.be.local_matrix()
+
+        def comm_apj(i_begin, i_end, muf, gradf, *ufj):
+            uf, _jmats = ufj[:nele], ufj[nele:]
+            jmats, tjmats = _jmats[:nele], _jmats[nele:]
+
+            for idx in range(i_begin, i_end):
+                ap = matrix(nfvars*nfvars, (nfvars, nfvars))
+                at = matrix(ntvars*ntvars, (ntvars, ntvars))
+
+                # Normal vector
+                nfi = nf[:, idx]
+                rcp_dxi = rcp_dx[idx]
+
+                # Left and right solutions
+                lti, lfi, lei = lt[idx], lf[idx], le[idx]
+                ul = uf[lti][lfi, :, lei]
+
+                # Get viscosity on face (saved at rhside)
+                mu = muf[0, idx]
+                mut = muf[1, idx]
+
+                # Compute Jacobian matrix on surface
+                # based on left/right cell
+                pos_jacobian(ul, nfi, ap)
+                vis_jacobian(ul, nfi, ap, mu, rcp_dxi, 1.0)
+
+                for row in range(nfvars):
+                    for col in range(nfvars):
+                        jmats[lti][0, row, col, lfi, lei] = ap[row][col]
+                
+                # Turbulent Jacobian
+                gf = gradf[:, :, idx]
+                ydnsi = ydist[idx]
+                
+                turb_jacobian(ul, nfi, at, rcp_dxi, mu, mut, gf, ydnsi)
+                for row in range(ntvars):
+                    for col in range(ntvars):
+                        tjmats[lti][0, row, col, lfi, lei] = at[row][col]
+
+        return self.be.make_loop(self.nfpts, comm_apj)
 
 
 class RANSSlipWallBCInters(RANSBCInters):

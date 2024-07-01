@@ -128,6 +128,10 @@ class EulerElements(BaseAdvecElements, FluidElements):
         if impl_op == 'spectral-radius':
             # Spectral radius on face
             self.fspr = np.empty((self.nface, self.neles))
+        elif impl_op == 'approx-jacobian':
+            # Jacobian matrix on face
+            self.jmat = np.empty((2, self.nfvars, self.nfvars, \
+                                  self.nface, self.neles))
 
         # Kernel to compute timestep
         self.timestep = Kernel(self._make_timestep(),

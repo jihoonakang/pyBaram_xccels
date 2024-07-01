@@ -18,7 +18,7 @@ def make_convective_jacobian(be, cplargs, sign):
     # convective Jacobian function
     _inviscid = make_inviscid_jacobian(be, cplargs)
 
-    def vl_positive_jacobian(uf, nf, ap, *args):
+    def vl_positive_jacobian(uf, nf, ap):
         """ Computes Van Leer FVS Jacobian matrix (Positive part)
 
         Parameters
@@ -91,7 +91,7 @@ def make_convective_jacobian(be, cplargs, sign):
                 ap[ndims+1][i+1] = c1*ap[0][i+1] + c4*(-c2*v[i] + c3*nf[i] + v[i])
             ap[ndims+1][ndims+1] = c1*ap[0][ndims+1] + c4*c2
 
-    def vl_negative_jacobian(uf, nf, am, *args):
+    def vl_negative_jacobian(uf, nf, am):
         """ Computes Van Leer FVS Jacobian matrix (Negative part)
 
         Parameters
@@ -180,6 +180,7 @@ def make_inviscid_jacobian(be, cplargs):
 
     def inviscid_jacobian(uf, nf, A):
         """ Computes convective flux Jacobian
+        Ref : Katate Masatsuka. (2013). I do like CFD, vol.1. CRADLE.
 
         Parameters
         ----------
@@ -202,7 +203,6 @@ def make_inviscid_jacobian(be, cplargs):
         H = c**2 / gam1 + 0.5 * q2
 
         # Computes each Jacobian matrix element.
-        # Ref : Katate Masatsuka. (2013). I do like CFD, vol.1. CRADLE.
         A[0][0] = 0.0
         A[0][1:ndims+1] = nf
         A[0][ndims+1] = 0.0

@@ -109,6 +109,10 @@ class NavierStokesElements(BaseAdvecDiffElements, ViscousFluidElements):
         if impl_op == 'spectral-radius':
             # Spectral radius
             self.fspr = np.empty((self.nface, self.neles))
+        elif impl_op == 'approx-jacobian':
+            # Jacobian matrix on face
+            self.jmat = np.empty((2, self.nfvars, self.nfvars, \
+                                  self.nface, self.neles))
 
         # Update arguments of post kerenl
         self.post.update_args(self.upts_in, self.mu)

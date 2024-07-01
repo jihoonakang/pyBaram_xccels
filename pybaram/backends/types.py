@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from mpi4py import MPI
-    
+import numpy as np
 
 class ArrayBank:
     """
@@ -30,7 +30,7 @@ class Kernel:
     """
     Kernel object
 
-    It stores the static argumentd.
+    It stores the static arguments.
     It executes function with static and dynamic arguments
     """
     def __init__(self, fun, *args, arg_trans_pos=False):

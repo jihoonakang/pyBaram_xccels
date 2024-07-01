@@ -479,40 +479,34 @@ class BlockJacobi(BaseSteadyIntegrator):
     impl_op = 'approx-jacobian'
 
     def construct_stages(self):
-        from pybaram.integrators.jacobi import make_jacobi_update, make_jacobi_sweep, make_jacobi_common
+        from pybaram.integrators.jacobi import make_jacobi_update, make_jacobi_sweep, \
+                                            make_pre_jacobi, make_tpre_jacobi
 
         # Constants for Jacobi method
         self.subiter = self.cfg.getint('solver-time-integrator', 'sub-iter', 10)
-        self.subtol = self.cfg.getfloat('solver-time-integrator', 'sub-tol', 0.005)
-        vistype = self.cfg.get('solver-time-integrator', 'visflux-jacobian', 'tlns')
+        self.subtol = self.cfg.getfloat('solver-time-integrator', 'sub-tol', 0.05)
 
         be = self.be
 
         for ele in self.sys.eles:
             # Temporal arrays
             diag = np.empty((ele.nfvars, ele.nfvars, ele.neles))
-            ele.subres = np.empty((ele.neles,))
-            
-            # Get viscosity if exists
-            mu = ele.mu if hasattr(ele, 'mu') else None
-            mut = ele.mut if hasattr(ele, 'mut') else None
+            ele.subres = np.zeros((ele.neles,), dtype=np.float64)
+            ele.norm = np.empty((ele.neles,))
 
-            # Jacobian matrix function
-            _pos_jacobian = ele.make_jacobian('positive', vistype)
-            _neg_jacobian = ele.make_jacobian('negative', vistype)
             nv = (0, ele.nfvars)
 
             # Diagonal matrix computation kernel
-            _pre_jacobi = make_jacobi_common(be, ele, nv, _pos_jacobian)
+            _pre_jacobi = make_pre_jacobi(ele, nv)
             pre_jacobi = Kernel(be.make_loop(ele.neles, _pre_jacobi),
-                                ele.upts[0], ele.dt, diag, mu, mut)
+                                ele.dt, diag, ele.jmat)
             
             # Sweep and compute subiteration step solution
-            _sweep, _compute = make_jacobi_sweep(be, ele, nv, _neg_jacobian)
+            _sweep, _compute = make_jacobi_sweep(be, ele, nv, res_idx=self._res_idx)
             sweep = Kernel(be.make_loop(ele.neles, _sweep),
-                               ele.upts[0], ele.upts[1], ele.upts[2], ele.upts[3], mu, mut)
+                               ele.upts[1], ele.upts[2], ele.upts[3], ele.jmat)
             compute = Kernel(be.make_loop(ele.neles, _compute),
-                                 ele.upts[2], ele.upts[3], diag, ele.subres)
+                                 ele.upts[2], ele.upts[3], diag, ele.subres, ele.norm)
             
             main_kernels = [sweep, compute]
             
@@ -520,62 +514,295 @@ class BlockJacobi(BaseSteadyIntegrator):
                 tdiag = np.empty((ele.nturbvars, ele.nturbvars, ele.neles))
                 tnv = (ele.nfvars, ele.nvars)
 
-                _tjacobian, _srcjacobian = ele.make_turb_jacobian()
+                _srcjacobian = ele.make_source_jacobian()
 
-                _pre_tjacobi = make_jacobi_common(be, ele, tnv, _tjacobian, _dsrc=_srcjacobian)
+                _pre_tjacobi = make_tpre_jacobi(ele, tnv, _srcjacobian, self._tcfl_fac)
                 pre_tjacobi = Kernel(be.make_loop(ele.neles, _pre_tjacobi),
-                                     ele.upts[0], ele.dt, tdiag, mu, mut)
+                                     ele.upts[0], ele.dt, tdiag, ele.tjmat)
                 
                 # Turbulent sweeps and compute kernel
-                _tsweep, _tcompute = make_jacobi_sweep(be, ele, tnv, _tjacobian)
+                _tsweep, _tcompute = make_jacobi_sweep(be, ele, tnv, fdx=0)
                 tsweep = Kernel(be.make_loop(ele.neles, _tsweep),
-                                ele.upts[0], ele.upts[1], ele.upts[2], ele.upts[3], mu, mut)
+                                ele.upts[1], ele.upts[2], ele.upts[3], ele.tjmat)
                 tcompute = Kernel(be.make_loop(ele.neles, _tcompute),
                                   ele.upts[2], ele.upts[3], tdiag)
                 
                 main_kernels += [tsweep, tcompute]
                 pre_kernels = [pre_jacobi, pre_tjacobi]
                 ele.pre_jacobi = MetaKernel(pre_kernels)
-
             else:
                 ele.pre_jacobi = pre_jacobi
             
             # Collect kernels and make meta kernels
-            ele.jacobi = MetaKernel(main_kernels)
+            ele.jacobi_sweep = MetaKernel(main_kernels)
 
             # Update kernel
-            unv = (0, ele.nvars)
-            _update = make_jacobi_update(unv)
-            ele.update = Kernel(be.make_loop(ele.neles, _update), ele.upts[0], ele.upts[2])
+            _update = make_jacobi_update(ele)
+            ele.update = Kernel(be.make_loop(ele.neles, _update),
+                                ele.upts[0], ele.upts[2], ele.subres)
+            
+            # Initialize dub array
+            ele.upts[2][:] = 0.0
 
     def step(self):
         resid = self.rhs(0, 1, is_norm=True)
+        self.sys.approx_jac()
         self.sys.eles.pre_jacobi()
-
-        # Temporal variables
-        dwmax1 = 0.0
-        dwmax2 = 0.0
-        dwmax = 0.0
 
         # Sub-iteration for Jacobi method
         for subiter in range(self.subiter):
-            dwmax2 = dwmax
-            dwmaxi = 0.0
-
-            self.sys.eles.jacobi()
+            # Jacobi sweep
+            self.sys.eles.jacobi_sweep()
 
             # Collect error from entire domain
-            for subresi in self.sys.eles.subres:
-                dwmaxi = max(max(subresi), dwmaxi)
-            dwmax = self._comm.allreduce(dwmaxi, op=MPI.MAX)
+            drhoi = sum(self.sys.eles.norm.sum())
+            drho = self._comm.allreduce(drhoi, op=MPI.SUM)
+            drho = np.sqrt(drho)
 
             if subiter == 0:
-                dwmax1 = dwmax
+                drho1 = drho
             else:
-                if abs(dwmax - dwmax2)/dwmax1 < self.subtol:
+                if drho/drho1 < self.subtol:
                     break
 
         self.sys.eles.update()
         self.sys.post(0)
         
         return 0, resid
+
+
+class BlockLUSGS(BaseSteadyIntegrator):
+    name = 'blu-sgs'
+    nreg = 3
+    impl_op = 'approx-jacobian'
+
+    def construct_stages(self):
+        from pybaram.integrators.blusgs import make_pre_blusgs, make_tpre_blusgs, \
+                                            make_serial_blusgs, make_blusgs_update
+
+        # Constants for Block LU-SGS subiteration
+        self.subiter = self.cfg.getint('solver-time-integrator', 'sub-iter', 10)
+        self.subtol = self.cfg.getfloat('solver-time-integrator', 'sub-tol', 0.1)
+
+        be = self.be
+
+        # Block LU-SGS method for each element
+        for ele in self.sys.eles:
+            # Get reordering result
+            mapping, unmapping = ele.reordering()
+
+            # Temporal array and matrix
+            diag = np.empty((ele.nfvars, ele.nfvars, ele.neles))
+            ele.subres = np.zeros((ele.neles,), dtype=np.float64)
+            ele.norm = np.empty(1)
+
+            nv = (0, ele.nfvars)
+            
+            # Compile Block LU-SGS functions
+            _update = make_blusgs_update(ele)
+            _pre_blusgs = make_pre_blusgs(be, ele, nv)
+            _lower, _upper = make_serial_blusgs(be, ele, nv, mapping, unmapping, \
+                                                res_idx=self._res_idx)
+
+            # Initiate Block LU-SGS kernel objects
+            pre_blusgs = Kernel(be.make_loop(ele.neles, _pre_blusgs),
+                                ele.dt, diag, ele.jmat)
+            
+            # sweep kernels
+            lsweeps = Kernel(be.make_loop(ele.neles, func=_lower),
+                ele.upts[1], ele.upts[2], diag, ele.jmat)
+            
+            usweeps = Kernel(be.make_loop(ele.neles, func=_upper),
+                ele.upts[1], ele.upts[2], diag, ele.jmat, ele.subres, ele.norm)
+            
+            sweep_kernels = [lsweeps, usweeps]
+
+            # Block LU-SGS for turbulent model
+            if self._is_turb:
+                tdiag = np.empty((ele.nturbvars, ele.nturbvars, ele.neles))
+                tnv = (ele.nfvars, ele.nvars)
+
+                _srcjacobian = ele.make_source_jacobian()
+
+                _pre_tblusgs = make_tpre_blusgs(be, ele, tnv, _srcjacobian, self._tcfl_fac)
+                pre_tblusgs = Kernel(be.make_loop(ele.neles, _pre_tblusgs),
+                                     ele.upts[0], ele.dt, tdiag, ele.tjmat)
+                
+                _tlsweep, _tusweep = make_serial_blusgs(be, ele, tnv, mapping, unmapping, \
+                                                        fdx=0)
+                tlsweep = Kernel(be.make_loop(ele.neles, _tlsweep),
+                                 ele.upts[1], ele.upts[2], tdiag, ele.tjmat)
+                tusweep = Kernel(be.make_loop(ele.neles, _tusweep),
+                                 ele.upts[1], ele.upts[2], tdiag, ele.tjmat)
+
+                sweep_kernels += [tlsweep, tusweep]
+                pre_kernels = [pre_blusgs, pre_tblusgs]
+                ele.pre_blusgs = MetaKernel(pre_kernels)
+            else:
+                ele.pre_blusgs = pre_blusgs
+
+            # Collect all kernels
+            ele.blusgs_sweep = MetaKernel(sweep_kernels)
+
+            # Update kernel
+            ele.update = Kernel(be.make_loop(ele.neles, _update),
+                                ele.upts[0], ele.upts[2], ele.subres)
+
+            # Initialize dub array
+            ele.upts[2][:] = 0.0
+
+    def step(self):
+        resid = self.rhs(0, 1, is_norm=True)
+        self.sys.approx_jac()
+
+        # Compute diagonal matrix
+        self.sys.eles.pre_blusgs()
+
+        # Subiteration for Block LU-SGS
+        for subiter in range(self.subiter):
+            # Block LU-SGS sweep
+            self.sys.eles.blusgs_sweep()
+
+            # Collect L2-norm for all domain
+            drhoi = sum(self.sys.eles.norm[0])
+            drho = self._comm.allreduce(drhoi, op=MPI.SUM)
+            drho = np.sqrt(drho)
+
+            # Check sub-convergence
+            if subiter == 0:
+                drho1 = drho
+            else:
+                if drho/drho1 < self.subtol:
+                    break
+
+        self.sys.eles.update()
+        self.sys.post(0)
+
+        return 0, resid
+
+
+class ColoredBlockLUSGS(BaseSteadyIntegrator):
+    name = 'colored-blu-sgs'
+    nreg = 3
+    impl_op = 'approx-jacobian'
+
+    def construct_stages(self):
+        from pybaram.integrators.blusgs import make_pre_blusgs, make_tpre_blusgs, \
+                                            make_colored_blusgs, make_blusgs_update
+        
+        # Constants for Block LU-SGS subiteration
+        self.subiter = self.cfg.getint('solver-time-integrator', 'sub-iter', 10)
+        self.subtol = self.cfg.getfloat('solver-time-integrator', 'sub-tol', 0.1)
+
+        be = self.be
+
+        # Colored Block LU-SGS for each elements
+        for ele in self.sys.eles:
+            # Get coloring result
+            ncolor, icolor, lev_color = ele.coloring()
+
+            # Temporal array and matrix
+            diag = np.empty((ele.nfvars, ele.nfvars, ele.neles))
+            ele.subres = np.zeros((ele.neles,), dtype=np.float64)
+            ele.norm = np.empty((ele.neles,))
+
+            nv = (0, ele.nfvars)
+
+            # Compile Block LU-SGS functions
+            _update = make_blusgs_update(ele)
+            _pre_blusgs = make_pre_blusgs(be, ele, nv)
+            _lower, _upper = make_colored_blusgs(be, ele, nv, icolor, lev_color, \
+                                                 res_idx=self._res_idx)
+
+            # Initiate Block LU-SGS kernel objects
+            pre_blusgs = Kernel(
+                be.make_loop(ele.neles, _pre_blusgs),
+                ele.dt, diag, ele.jmat
+            )
+
+            lsweeps = [
+                Kernel(be.make_loop(n0=n0, ne=ne, func=_lower),
+                ele.upts[1], ele.upts[2], diag, ele.jmat)
+                for n0, ne in zip(ncolor[:-1], ncolor[1:])
+            ]
+
+            usweeps = [
+                Kernel(be.make_loop(n0=n0, ne=ne, func=_upper),
+                ele.upts[1], ele.upts[2], diag, ele.jmat, ele.subres, ele.norm)
+                for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
+            ]
+
+            sweep_kernels = [*lsweeps, *usweeps]
+
+            # Colored Block LU-SGS for turbulence model
+            if self._is_turb:
+                # digonal matrix for turbulence model
+                tdiag = np.empty((ele.nturbvars, ele.nturbvars, ele.neles))
+                tnv = (ele.nfvars, ele.nvars)
+
+                # Source term Jacobian
+                _srcjacobian = ele.make_source_jacobian()
+
+                _pre_tblusgs = make_tpre_blusgs(be, ele, tnv, _srcjacobian, self._tcfl_fac)
+                pre_tblusgs = Kernel(be.make_loop(ele.neles, _pre_tblusgs),
+                                     ele.upts[0], ele.dt, tdiag, ele.tjmat)
+                
+                _tlsweep, _tusweep = make_colored_blusgs(be, ele, tnv, icolor, lev_color, fdx=0)
+
+                tlsweeps = [
+                    Kernel(be.make_loop(n0=n0, ne=ne, func=_tlsweep),
+                    ele.upts[1], ele.upts[2], tdiag, ele.tjmat)
+                    for n0, ne in zip(ncolor[:-1], ncolor[1:])
+                ]
+
+                tusweeps = [
+                    Kernel(be.make_loop(n0=n0, ne=ne, func=_tusweep),
+                    ele.upts[1], ele.upts[2], tdiag, ele.tjmat)
+                    for n0, ne in zip(ncolor[::-1][1:], ncolor[::-1][:-1])
+                ]
+
+                sweep_kernels += [*tlsweeps, *tusweeps]
+                pre_kernels = [pre_blusgs, pre_tblusgs]
+                ele.pre_blusgs = MetaKernel(pre_kernels)
+            else:
+                ele.pre_blusgs = pre_blusgs
+
+            # Collect all kernels
+            ele.blusgs_sweep = MetaKernel(sweep_kernels)
+
+            # Update kernel
+            ele.update = Kernel(be.make_loop(ele.neles, _update),
+                                ele.upts[0], ele.upts[2], ele.subres)
+            
+            # Initialize dub array
+            ele.upts[2][:] = 0.0
+
+    def step(self):
+        resid = self.rhs(0, 1, is_norm=True)
+        self.sys.approx_jac()
+
+        # Compute diagonal matrix
+        self.sys.eles.pre_blusgs()
+
+        # Subiteration for Block LU-SGS
+        for subiter in range(self.subiter):
+            # Block LU-SGS sweep
+            self.sys.eles.blusgs_sweep()
+
+            # Collect L2-norm for all domain
+            drhoi = sum(self.sys.eles.norm.sum())
+            drho = self._comm.allreduce(drhoi, op=MPI.SUM)
+            drho = np.sqrt(drho)
+
+            # Check sub-convergence
+            if subiter == 0:
+                drho1 = drho
+            else:
+                if drho/drho1 < self.subtol:
+                    break
+
+        self.sys.eles.update()
+        self.sys.post(0)
+
+        return 0, resid
+
