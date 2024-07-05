@@ -25,7 +25,6 @@ in the :mod:`pybaram.integrators.steady` and the :mod:`pybaram.integrators.unste
         :inherited-members:
         :private-members:
 
-|
 
 For steady simulation, either explicit Runge-Kutta schemes or implicit LU-SGS schemes can be used, as implemented below.
 
@@ -77,12 +76,12 @@ For steady simulation, either explicit Runge-Kutta schemes or implicit LU-SGS sc
 .. admonition:: Colored Block LU-SGS
    :class: dropdown
 
-    .. autoclass:: pybaram.integrators.steady.BlockLUSGS
+    .. autoclass:: pybaram.integrators.steady.ColoredBlockLUSGS
       :members:
       :undoc-members:
       :inherited-members:
       :private-members:
-|
+
 
 The hierarchy of ``integrator`` class can be shown as below.
 

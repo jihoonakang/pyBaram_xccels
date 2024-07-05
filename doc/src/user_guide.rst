@@ -74,6 +74,7 @@ Mesh File
 Configuration File
 ==================
 The parameters for ``pyBaram`` simulation are specified in the configuration file. This file is written in the INI file format, and it is parsed using the ``configparser`` module. The following sections provide details on the sections and parameters.
+
 Backends
 ---------
 The backend section configures how to run ``pybaram``. 
