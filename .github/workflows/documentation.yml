@@ -29,7 +29,8 @@ jobs:
       # Runs a single command using the runners shell
       - name: dependencies
         run: |
-          apt-get install -y build-essential texlive-latex-extra dvipng graphviz
+          sudo apt-get update -q -y
+          sudo apt-get install -y build-essential texlive-latex-extra dvipng graphviz
           conda env create -f .environment.yml
           conda init
           source ~/.bashrc
