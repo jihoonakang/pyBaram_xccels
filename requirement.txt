@@ -1,6 +1,7 @@
 numpy
 numba
 h5py
+mpi4py
 sphinx
 numpydoc
 sphinx_rtd_theme
