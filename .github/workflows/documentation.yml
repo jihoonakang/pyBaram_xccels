@@ -30,6 +30,8 @@ jobs:
       - name: dependencies
         run: |
           conda env create -f .environment.yml
+          conda init bash
+          source ~/.bashrc
           conda activate pybaram
 
       # Runs a set of commands using the runners shell
