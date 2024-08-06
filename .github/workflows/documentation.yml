@@ -32,7 +32,8 @@ jobs:
           sudo apt-get update -q -y
           sudo apt-get install -y build-essential texlive-latex-extra dvipng graphviz
           conda env create -f .environment.yml
-          conda init         
+          conda init bash
+          source ~/.bash_profile
           conda activate pybaram
 
       # Runs a set of commands using the runners shell
